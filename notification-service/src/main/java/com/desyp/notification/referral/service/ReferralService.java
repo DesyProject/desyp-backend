@@ -2,6 +2,7 @@ package com.desyp.notification.referral.service;
 
 import java.util.List;
 import com.desyp.common.exception.BusinessException;
+import com.desyp.notification.auth.AuthProvider;
 import com.desyp.notification.referral.dto.ReferralScoreResponse;
 import com.desyp.notification.referral.dto.ReferralRankingResponse;
 import com.desyp.notification.referral.repository.ReferralRepository;
@@ -17,8 +18,8 @@ import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.SU
 public class ReferralService {
     private final ReferralRepository referralRepository;
 
-    public ReferralScoreResponse myScore(String googleSub) {
-        var score = referralRepository.findScore(googleSub)
+    public ReferralScoreResponse myScore(AuthProvider provider, String providerAccountId) {
+        var score = referralRepository.findScore(provider.name(), providerAccountId)
                 .orElseThrow(() -> new BusinessException(SUBSCRIBER_NOT_FOUND));
         return new ReferralScoreResponse(score.getSubscriberId(), score.getInviteToken(),
                 score.getReferralCount(), score.getReferralBonus(), score.getTotalScore());

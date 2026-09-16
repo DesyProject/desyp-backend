@@ -2,7 +2,7 @@ package com.desyp.notification.referral.controller;
 
 import java.util.List;
 import com.desyp.common.response.ApiResponse;
-import com.desyp.notification.auth.GoogleAccount;
+import com.desyp.notification.auth.SocialAccount;
 import com.desyp.notification.referral.dto.ReferralScoreResponse;
 import com.desyp.notification.referral.dto.ReferralRankingResponse;
 import com.desyp.notification.referral.service.ReferralService;
@@ -21,7 +21,8 @@ public class ReferralController {
 
     @GetMapping("/api/referrals/me")
     public ApiResponse<ReferralScoreResponse> myScore(OAuth2AuthenticationToken authentication) {
-        return ApiResponse.success(referralService.myScore(GoogleAccount.require(authentication).getSubject()));
+        var account = SocialAccount.require(authentication);
+        return ApiResponse.success(referralService.myScore(account.provider(), account.accountId()));
     }
 
     @GetMapping("/api/admin/referrals/ranking")

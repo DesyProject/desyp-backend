@@ -2,6 +2,7 @@ package com.desyp.notification.global;
 
 import jakarta.servlet.http.HttpServletResponse;
 import com.desyp.notification.auth.AdminAccess;
+import com.desyp.notification.auth.NaverOAuth2UserService;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -16,7 +17,8 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
-            ObjectProvider<ClientRegistrationRepository> registrations, AdminAccess adminAccess) throws Exception {
+            ObjectProvider<ClientRegistrationRepository> registrations, AdminAccess adminAccess,
+            NaverOAuth2UserService naverOAuth2UserService) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/api/csrf", "/oauth2/**", "/login/**").permitAll()
                 .requestMatchers("/api/admin/**").access((authentication, context) ->
@@ -26,7 +28,7 @@ public class SecurityConfig {
                 .authenticationEntryPoint((request, response, exception) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"success\":false,\"data\":null,\"message\":\"Google 로그인이 필요합니다\"}");
+                    response.getWriter().write("{\"success\":false,\"data\":null,\"message\":\"로그인이 필요합니다\"}");
                 })
                 .accessDeniedHandler((request, response, exception) -> {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -34,7 +36,8 @@ public class SecurityConfig {
                     response.getWriter().write("{\"success\":false,\"data\":null,\"message\":\"요청 권한 또는 CSRF 토큰을 확인해주세요\"}");
                 }));
         if (registrations.getIfAvailable() != null) {
-            http.oauth2Login(login -> login.defaultSuccessUrl("/api/csrf", true));
+            http.oauth2Login(login -> login.defaultSuccessUrl("/api/csrf", true)
+                    .userInfoEndpoint(userInfo -> userInfo.userService(naverOAuth2UserService)));
         }
         http.csrf(Customizer.withDefaults());
         return http.build();
