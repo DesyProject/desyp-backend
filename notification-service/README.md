@@ -22,6 +22,7 @@ Google 콘솔에 `{서비스 외부 주소}/login/oauth2/code/google`을, 네이
 
 Flyway가 `subscribers` 테이블을 생성하고 Hibernate가 스키마를 검증한다. 이미 수동 생성한 테이블이 있는 DB는 자동 baseline하지 않으므로 별도 마이그레이션 계획이 필요하다.
 OAuth 프로필 없이도 테스트할 수 있지만 실제 Google 로그인과 등록은 사용할 수 없다.
+API 문서는 `http://localhost:8080/swagger-ui/index.html` (스펙: `/v3/api-docs`)에서 확인한다. 로그인 없이 접근 가능하다.
 
 ## API
 

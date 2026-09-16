@@ -210,6 +210,11 @@ class SubscriberRegistrationTest {
     }
 
     @Test
+    void apiDocsAreAccessibleWithoutLogin() throws Exception {
+        mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
+    }
+
+    @Test
     void requiresAuthentication() throws Exception {
         mvc.perform(post("/api/subscribers").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                         .content(body("user@gmail.com", null)))
