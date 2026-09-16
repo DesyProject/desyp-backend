@@ -1,2 +1,2 @@
-# desip-backend
+# desyp-backend
 [대규모 시스템 프로젝트] 대규모 시스템 사이드 프로젝트
