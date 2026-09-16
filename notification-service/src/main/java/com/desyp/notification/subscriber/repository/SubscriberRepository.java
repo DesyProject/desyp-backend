@@ -1,5 +1,6 @@
 package com.desyp.notification.subscriber.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,4 +15,6 @@ public interface SubscriberRepository extends JpaRepository<Subscriber, Long> {
     boolean existsByEmailNormalized(String emailNormalized);
 
     Optional<Subscriber> findByInviteToken(String inviteToken);
+
+    List<Subscriber> findByNotifiedAtIsNull();
 }
