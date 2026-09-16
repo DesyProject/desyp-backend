@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/desip}
+    username: ${DB_USERNAME:desip}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+logging:
+  level:
+    # UNIQUE 위반의 DB 오류 메시지에 이메일/google_sub 값이 포함될 수 있다.
+    org.hibernate.orm.jdbc.error: OFF

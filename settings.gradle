@@ -1,0 +1,3 @@
+rootProject.name = 'desip'
+
+include 'common', 'notification-service', 'event-entry-service'

@@ -1,0 +1,15 @@
+plugins {
+    id 'java-library'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES
+    }
+}
+
+dependencies {
+    api 'org.springframework:spring-web'
+    implementation 'org.slf4j:slf4j-api'
+    implementation 'org.springframework:spring-context'
+}
