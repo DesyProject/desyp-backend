@@ -20,7 +20,7 @@ desyp의 상시 알림 트랙. 사전 등록, 추천 점수와 순위, 이벤트
 - Java 21, Spring Boot, PostgreSQL, Flyway
 - 배포 목표: AWS Lambda. 현재 인증은 서버 세션이므로 Lambda/다중 인스턴스의 세션 공유 방식은 배포 전 확정한다.
 - Google OIDC는 `openid`, `email`만 요청한다.
-- AWS SES 발송, EventBridge Scheduler 예약 실행은 미구현이다.
+- AWS SES 발송은 관리자 트리거 API로 구현했다. EventBridge Scheduler 자동 예약 실행은 미구현이다.
 - 초기 규모: 2개월간 낮고 꾸준한 사전 등록 트래픽. 이벤트 당일 응모 고트래픽은 event-entry-service 책임이다.
 
 ## 패키지와 책임
@@ -29,7 +29,7 @@ desyp의 상시 알림 트랙. 사전 등록, 추천 점수와 순위, 이벤트
 - `auth`: 인증 계정 확인, 관리자 접근 허용 목록
 - `referral`: 내 점수와 관리자 추천 순위 조회
 - `global`: 세션/CSRF 보안 설정
-- `mail`: 후속 SES 발송 구현 예정
+- `mail`: 관리자 트리거 기반 SES 발송, 발송 이력 중복 방지(`notified_at`)
 
 공통 `BaseErrorCode`, `BusinessException`, `ApiResponse`, 예외 처리는 `common`을 사용한다.
 
@@ -44,6 +44,7 @@ desyp의 상시 알림 트랙. 사전 등록, 추천 점수와 순위, 이벤트
 - `referral_bonus`: 추천인이 없으면 0, 있으면 1. 생성자가 추천 관계로 결정하며 요청 값으로 받지 않는다.
 - `invite_token`: UUID 추천 코드, UNIQUE
 - `age_confirmed`, `consent_at`, `created_at`: 동의와 생성 기록
+- `notified_at`: 이벤트 시작 알림 메일 발송 시각. NULL이면 미발송 대상이며 발송 성공 시 채워 중복 발송을 막는다.
 
 실제 추천 인원은 저장된 `referrer_id` 관계를 `COUNT`로 집계한다. 별도의 누적 카운터를 증가시키지 않아 동시 갱신 유실과 카운터 불일치를 피한다.
 보너스는 별도 컬럼으로 저장한다. DB CHECK로 추천 관계에 맞는 0/1 값과 자기추천 금지를 검증한다.

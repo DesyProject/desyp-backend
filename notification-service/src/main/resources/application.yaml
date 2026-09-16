@@ -22,3 +22,5 @@ logging:
 desyp:
   admin:
     google-subs: ${ADMIN_GOOGLE_SUBS:}
+  mail:
+    sender-email: ${SES_SENDER_EMAIL:}

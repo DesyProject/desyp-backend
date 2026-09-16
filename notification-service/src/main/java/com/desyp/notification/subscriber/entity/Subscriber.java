@@ -63,6 +63,9 @@ public class Subscriber {
     @Column(name = "created_at", insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "notified_at")
+    private OffsetDateTime notifiedAt;
+
     @Builder
     private Subscriber(AuthProvider provider, String providerAccountId, String email, String emailNormalized,
                         Subscriber referrer, String inviteToken, boolean ageConfirmed, OffsetDateTime consentAt) {
@@ -75,5 +78,9 @@ public class Subscriber {
         this.inviteToken = inviteToken;
         this.ageConfirmed = ageConfirmed;
         this.consentAt = consentAt;
+    }
+
+    public void markNotified(OffsetDateTime notifiedAt) {
+        this.notifiedAt = notifiedAt;
     }
 }

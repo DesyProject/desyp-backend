@@ -346,6 +346,15 @@ class SubscriberRegistrationTest {
     }
 
     @Test
+    void mailEventStartRequiresAdmin() throws Exception {
+        mvc.perform(post("/api/admin/mail/event-start").with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/admin/mail/event-start").with(google("normal-user", "normal@gmail.com", true)).with(csrf()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/admin/mail/event-start").with(google("admin-user", "admin@gmail.com", true)).with(csrf()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void rankingRejectsInvalidBounds() throws Exception {
         for (String bound : new String[] {"0", "101", "abc"}) {
             mvc.perform(get("/api/admin/referrals/ranking?maxRank=" + bound)

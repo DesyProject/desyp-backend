@@ -10,6 +10,7 @@ Java 21과 PostgreSQL을 준비한다. 다음 환경 변수를 설정한다.
 - `DB_USERNAME`, `DB_PASSWORD`
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`
+- `SES_SENDER_EMAIL`: SES에서 인증된 발신 이메일 주소
 - `SPRING_PROFILES_ACTIVE=oauth`
 
 Google 콘솔에 `{서비스 외부 주소}/login/oauth2/code/google`을, 네이버 개발자센터에 `{서비스 외부 주소}/login/oauth2/code/naver`를 Redirect URI로 등록한다.
@@ -48,7 +49,7 @@ API 문서는 `http://localhost:8080/swagger-ui/index.html` (스펙: `/v3/api-do
 인증 없이 CSRF 토큰도 생략한 요청은 보안 필터 순서에 따라 403이 반환될 수 있다.
 이메일 정규화는 소문자화, `+` 별칭 절삭, Gmail 점 제거 및 googlemail.com 통합을 적용한다.
 
-SES 메일 발송, 예약 스케줄, 실제 소셜 자격 증명 발급, Lambda 배포는 후속 작업이다.
+예약 스케줄(EventBridge Scheduler), 실제 소셜 자격 증명 발급, Lambda 배포는 후속 작업이다.
 현재 인증은 서버 세션을 사용한다. Lambda/여러 인스턴스 배포 전 세션 공유 방식은 별도로 확정해야 한다.
 
 ## 추천 점수
@@ -87,16 +88,27 @@ Google 로그인 세션으로 `GET /api/referrals/me`를 호출한다. 가입 �
 {"success":true,"data":[{"rank":1,"subscriberId":2,"email":"b@example.com","referralCount":1,"referralBonus":1,"totalScore":2}],"message":null}
 ```
 
+### 이벤트 알림 메일
+
+`POST /api/admin/mail/event-start` — 관리자 계정만 호출 가능(관리자 순위 API와 동일한 `ADMIN_GOOGLE_SUBS` 검증).
+아직 알림을 받지 않은(`notified_at IS NULL`) 구독자 전원에게 SES로 발송하고, 발송 성공한 사람만 `notified_at`을 채운다.
+같은 사람에게 중복 발송하지 않으므로 실패한 발송만 다시 호출해 재시도할 수 있다. 실제 호출 시각(EventBridge Scheduler 연동)은 아직 미확정이다.
+
+```json
+{"success":true,"data":{"sentCount":2},"message":null}
+```
+
 ### DB 업그레이드
 
 Flyway V2는 보너스 컬럼과 제약을 추가하고, 기존 가입자 중 추천인이 있는 사람에게 보너스 1점을 적용한다.
+V3는 로그인 제공자 컬럼을 추가해 Google·네이버 계정을 구분하고, V4는 메일 발송 여부를 기록하는 `notified_at`을 추가한다.
 추천 관계와 보너스는 가입 후 변경할 수 없으며, 별도 점수 증가 API는 없다.
 다계정 추가 방지는 적용하지 않는다. 동일 계정·정규화 이메일 중복과 자기추천은 차단한다.
 
 ## 예정된 전체 흐름
 
 Google·네이버 로그인 → 사전 등록/추천 연결 → 내 점수/관리자 최고점 조회 → 이벤트 시작 1~2시간 전 SES 이메일 발송.
-현재 Google·네이버 등록과 추천 점수 조회까지 구현했다. SES/EventBridge Scheduler는 아직 구현하지 않았다.
+현재 Google·네이버 등록, 추천 점수 조회, 관리자 트리거 기반 SES 발송까지 구현했다. EventBridge Scheduler 자동 트리거는 아직 구현하지 않았다.
 정확한 행사 시각과 발송 간격(1시간 또는 2시간)은 확정되지 않았다.
 
 ## 검증
