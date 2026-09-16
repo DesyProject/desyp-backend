@@ -1,4 +1,4 @@
-# desiP — 대규모 인프라 대응 프로젝트 (모노레포)
+# desyp — 대규모 인프라 대응 프로젝트 (모노레포)
 
 이 저장소는 두 개의 독립 서비스로 구성된다. 각 서비스 폴더 안의 CLAUDE.md에 서비스별 상세 규칙이 있다 — 여기는 두 서비스에 공통으로 적용되는 규칙만 담는다.
 
@@ -26,7 +26,7 @@
 두 서비스에서 완전히 동일하게 쓰는 코드만 여기 둔다 (서비스별로 다른 설정은 각 서비스의 `global`에 남긴다).
 
 ```
-com.desip.common
+com.desyp.common
 ├── exception   (BaseErrorCode, BusinessException, GlobalExceptionHandler)
 └── response    (ApiResponse)
 ```

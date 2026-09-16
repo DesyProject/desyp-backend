@@ -1,4 +1,4 @@
-# desip 작업 지침
+# desyp 작업 지침
 
 코드를 수정하기 전 루트 `CLAUDE.md`와 해당 서비스의 `CLAUDE.md`를 읽고 따른다.
 

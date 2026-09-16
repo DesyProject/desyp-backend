@@ -4,7 +4,7 @@ plugins {
 }
 
 allprojects {
-    group = 'com.desip'
+    group = 'com.desyp'
     version = '0.0.1-SNAPSHOT'
 
     repositories {

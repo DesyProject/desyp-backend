@@ -1,6 +1,6 @@
 # event-entry-service
 
-desiP의 이벤트 트랙. 10/31 이벤트 당일 응모 처리 담당 (1등/N번째 순번, 랜덤 추첨, 추천인 집계용 토큰 매칭).
+desyp의 이벤트 트랙. 10/31 이벤트 당일 응모 처리 담당 (1등/N번째 순번, 랜덤 추첨, 추천인 집계용 토큰 매칭).
 (공통 규칙은 저장소 루트 CLAUDE.md 참고 — 여기는 이 서비스 전용 내용만)
 
 ## 목표 규모
@@ -11,14 +11,14 @@ desiP의 이벤트 트랙. 10/31 이벤트 당일 응모 처리 담당 (1등/N�
 ## 패키지 구조
 
 ```
-com.desip.event
+com.desyp.event
 ├── entry
 ├── ratelimit
 ├── rank
 └── global          (이 서비스 전용: Redis 커넥션, 보안 설정 등)
 ```
 
-`BaseErrorCode`, `BusinessException`, `ApiResponse`는 이 서비스에 만들지 않는다 — `common` 모듈(`com.desip.common`) 것을 가져다 쓴다.
+`BaseErrorCode`, `BusinessException`, `ApiResponse`는 이 서비스에 만들지 않는다 — `common` 모듈(`com.desyp.common`) 것을 가져다 쓴다.
 
 ## 기술 스택
 

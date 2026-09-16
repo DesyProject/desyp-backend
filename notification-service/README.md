@@ -6,7 +6,7 @@ Google OIDC 로그인 → CSRF 토큰 조회 → 사전 등록 순서로 사용�
 
 Java 21과 PostgreSQL을 준비한다. 다음 환경 변수를 설정한다.
 
-- `DB_URL`: 예: `jdbc:postgresql://localhost:5432/desip`
+- `DB_URL`: 예: `jdbc:postgresql://localhost:5432/desyp`
 - `DB_USERNAME`, `DB_PASSWORD`
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `SPRING_PROFILES_ACTIVE=oauth`

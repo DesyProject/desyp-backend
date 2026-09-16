@@ -1,6 +1,6 @@
 # notification-service
 
-desiP의 상시 알림 트랙. 이벤트 사전 등록, 추천인 시스템, 메일 발송 담당.
+desyp의 상시 알림 트랙. 이벤트 사전 등록, 추천인 시스템, 메일 발송 담당.
 (공통 규칙은 저장소 루트 CLAUDE.md 참고 — 여기는 이 서비스 전용 내용만)
 
 ## 목표 규모
@@ -16,7 +16,7 @@ desiP의 상시 알림 트랙. 이벤트 사전 등록, 추천인 시스템, 메
 ## 패키지 구조
 
 ```
-com.desip.notification
+com.desyp.notification
 ├── subscriber
 ├── auth
 ├── referral
@@ -24,7 +24,7 @@ com.desip.notification
 └── global          (이 서비스 전용: OAuth 시큐리티 설정 등)
 ```
 
-`BaseErrorCode`, `BusinessException`, `ApiResponse`는 이 서비스에 만들지 않는다 — `common` 모듈(`com.desip.common`) 것을 가져다 쓴다.
+`BaseErrorCode`, `BusinessException`, `ApiResponse`는 이 서비스에 만들지 않는다 — `common` 모듈(`com.desyp.common`) 것을 가져다 쓴다.
 
 ## 데이터 모델 — subscribers 테이블
 
