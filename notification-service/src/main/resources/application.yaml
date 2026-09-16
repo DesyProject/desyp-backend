@@ -19,3 +19,6 @@ logging:
   level:
     # UNIQUE 위반의 DB 오류 메시지에 이메일/google_sub 값이 포함될 수 있다.
     org.hibernate.orm.jdbc.error: OFF
+desyp:
+  admin:
+    google-subs: ${ADMIN_GOOGLE_SUBS:}

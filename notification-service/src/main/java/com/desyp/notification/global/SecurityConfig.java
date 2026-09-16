@@ -1,6 +1,8 @@
 package com.desyp.notification.global;
 
 import jakarta.servlet.http.HttpServletResponse;
+import com.desyp.notification.auth.AdminAccess;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,9 +16,11 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
-            ObjectProvider<ClientRegistrationRepository> registrations) throws Exception {
+            ObjectProvider<ClientRegistrationRepository> registrations, AdminAccess adminAccess) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/api/csrf", "/oauth2/**", "/login/**").permitAll()
+                .requestMatchers("/api/admin/**").access((authentication, context) ->
+                        new AuthorizationDecision(adminAccess.isAllowed(authentication.get())))
                 .anyRequest().authenticated());
         http.exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint((request, response, exception) -> {

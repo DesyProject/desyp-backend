@@ -38,6 +38,7 @@ out/
 
 ### Local analysis and secrets ###
 graphify-out/
+.serena/
 .env
 .env.*
 !.env.example

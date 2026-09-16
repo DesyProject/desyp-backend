@@ -28,16 +28,17 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(properties = "desyp.admin.google-subs=admin-user")
 @AutoConfigureMockMvc
 class SubscriberRegistrationTest {
     @Autowired MockMvc mvc;
     @Autowired SubscriberRepository repository;
     @Autowired SubscriberService service;
+    @Autowired com.desyp.notification.referral.service.ReferralService referrals;
 
     @BeforeEach
     void clean() {
-        repository.deleteAll();
+        repository.deleteAllInBatch();
     }
 
     private RequestPostProcessor google(String subject, String email, boolean verified) {
@@ -221,5 +222,115 @@ class SubscriberRegistrationTest {
         } finally {
             Locale.setDefault(previous);
         }
+    }
+
+    @Test
+    void referralChainAwardsBothSidesAndKeepsCountsSeparate() throws Exception {
+        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        var b = service.register("b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
+        service.register("c", "c@gmail.com", request("c@gmail.com", b.inviteToken()));
+        assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
+        assertThat(referrals.myScore("a").referralBonus()).isZero();
+        assertThat(referrals.myScore("b").referralCount()).isEqualTo(1);
+        assertThat(referrals.myScore("b").referralBonus()).isEqualTo(1);
+        assertThat(referrals.myScore("b").totalScore()).isEqualTo(2);
+        assertThat(referrals.myScore("c").referralCount()).isZero();
+        assertThat(referrals.myScore("c").referralBonus()).isEqualTo(1);
+        mvc.perform(get("/api/referrals/me").with(google("b", "b@gmail.com", true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.referralCount").value(1))
+                .andExpect(jsonPath("$.data.referralBonus").value(1))
+                .andExpect(jsonPath("$.data.totalScore").value(2))
+                .andExpect(jsonPath("$.data.inviteToken").value(b.inviteToken()));
+    }
+
+    @Test
+    void duplicateRegistrationCannotAwardBonusTwiceOrChangeReferrer() {
+        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        var b = service.register("b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
+        var c = service.register("c", "c@gmail.com", request("c@gmail.com", null));
+        assertThatThrownBy(() -> service.register("b", "b@gmail.com", request("b@gmail.com", c.inviteToken())))
+                .isInstanceOf(BusinessException.class);
+        assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
+        assertThat(referrals.myScore("b").referralBonus()).isEqualTo(1);
+        assertThat(referrals.myScore("c").totalScore()).isZero();
+        assertThat(repository.findById(b.id()).orElseThrow().getReferrer().getId()).isEqualTo(a.id());
+    }
+
+    @Test
+    void unsuccessfulRegistrationDoesNotAwardPoints() {
+        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        assertThatThrownBy(() -> service.register("b", "b@gmail.com",
+                new SubscriberRegisterRequest("b@gmail.com", true, false, a.inviteToken())))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.register("b", "other@gmail.com", request("b@gmail.com", a.inviteToken())))
+                .isInstanceOf(BusinessException.class);
+        assertThat(referrals.myScore("a").totalScore()).isZero();
+    }
+
+    @Test
+    void rankingIncludesAllTiesAtRequestedRankAndDoesNotExposeInviteTokens() throws Exception {
+        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        service.register("b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
+        service.register("c", "c@gmail.com", request("c@gmail.com", null));
+        mvc.perform(get("/api/admin/referrals/ranking?maxRank=1").with(google("admin-user", "admin@gmail.com", true)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].rank").value(1))
+                .andExpect(jsonPath("$.data[1].rank").value(1))
+                .andExpect(jsonPath("$.data[0].totalScore").value(1))
+                .andExpect(jsonPath("$.data[0].inviteToken").doesNotExist());
+        assertThat(referrals.ranking(10)).extracting(row -> row.rank()).containsExactly(1L, 1L, 3L);
+    }
+
+    @Test
+    void rankingRequiresVerifiedAllowlistedGoogleAccount() throws Exception {
+        mvc.perform(get("/api/admin/referrals/ranking")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/referrals/ranking").with(google("normal-user", "normal@gmail.com", true)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/referrals/ranking").with(google("admin-user", "admin@gmail.com", false)))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/referrals/ranking").with(user("admin-user").roles("ADMIN")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rankingRejectsInvalidBounds() throws Exception {
+        for (String bound : new String[] {"0", "101", "abc"}) {
+            mvc.perform(get("/api/admin/referrals/ranking?maxRank=" + bound)
+                            .with(google("admin-user", "admin@gmail.com", true)))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
+        }
+    }
+
+    @Test
+    void scoreRequiresRegisteredAccountAndDoesNotAcceptAnotherUserId() throws Exception {
+        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        mvc.perform(get("/api/referrals/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/referrals/me?googleSub=a").with(google("b", "b@gmail.com", true)))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/referrals/me?googleSub=b").with(google("a", "a@gmail.com", true)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.subscriberId").value(a.id()));
+    }
+
+    @Test
+    void concurrentReferralsDoNotLosePoints() throws Exception {
+        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(4)) {
+            var tasks = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int i = 0; i < 8; i++) {
+                String subject = "invitee-" + i;
+                tasks.add(executor.submit(() -> {
+                    if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("start timeout");
+                    return service.register(subject, subject + "@gmail.com", request(subject + "@gmail.com", a.inviteToken()));
+                }));
+            }
+            start.countDown();
+            for (var task : tasks) task.get(20, TimeUnit.SECONDS);
+        }
+        assertThat(referrals.myScore("a").referralCount()).isEqualTo(8);
+        assertThat(referrals.myScore("a").referralBonus()).isZero();
+        assertThat(referrals.myScore("a").totalScore()).isEqualTo(8);
+        for (int i = 0; i < 8; i++) assertThat(referrals.myScore("invitee-" + i).referralBonus()).isEqualTo(1);
     }
 }

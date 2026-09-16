@@ -37,8 +37,11 @@ public class Subscriber {
     private String emailNormalized;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "referrer_id")
+    @JoinColumn(name = "referrer_id", updatable = false)
     private Subscriber referrer;
+
+    @Column(name = "referral_bonus", nullable = false, updatable = false)
+    private int referralBonus;
 
     @Column(name = "invite_token", nullable = false, unique = true)
     private String inviteToken;
@@ -59,6 +62,7 @@ public class Subscriber {
         this.email = email;
         this.emailNormalized = emailNormalized;
         this.referrer = referrer;
+        this.referralBonus = referrer == null ? 0 : 1;
         this.inviteToken = inviteToken;
         this.ageConfirmed = ageConfirmed;
         this.consentAt = consentAt;
