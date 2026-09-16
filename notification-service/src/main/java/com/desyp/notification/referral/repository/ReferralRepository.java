@@ -14,10 +14,10 @@ public interface ReferralRepository extends Repository<Subscriber, Long> {
                    COUNT(c.id) AS referralCount, s.referral_bonus AS referralBonus,
                    COUNT(c.id) + s.referral_bonus AS totalScore
             FROM subscribers s LEFT JOIN subscribers c ON c.referrer_id = s.id
-            WHERE s.google_sub = :googleSub
+            WHERE s.provider = :provider AND s.provider_account_id = :providerAccountId
             GROUP BY s.id, s.invite_token, s.referral_bonus
             """, nativeQuery = true)
-    Optional<Score> findScore(@Param("googleSub") String googleSub);
+    Optional<Score> findScore(@Param("provider") String provider, @Param("providerAccountId") String providerAccountId);
 
     @Query(value = """
             SELECT ranked.* FROM (

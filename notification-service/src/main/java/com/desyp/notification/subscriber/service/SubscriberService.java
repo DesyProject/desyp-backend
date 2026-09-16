@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.desyp.common.exception.BusinessException;
+import com.desyp.notification.auth.AuthProvider;
 import com.desyp.notification.subscriber.dto.SubscriberRegisterRequest;
 import com.desyp.notification.subscriber.dto.SubscriberRegisterResponse;
 import com.desyp.notification.subscriber.entity.Subscriber;
@@ -27,10 +28,10 @@ public class SubscriberService {
     private final SubscriberRepository subscriberRepository;
 
     @Transactional
-    public SubscriberRegisterResponse register(String googleSub, String verifiedEmail,
+    public SubscriberRegisterResponse register(AuthProvider provider, String providerAccountId, String verifiedEmail,
                                                SubscriberRegisterRequest request) {
-        if (!StringUtils.hasText(googleSub)) {
-            throw new BusinessException(GOOGLE_LOGIN_REQUIRED);
+        if (provider == null || !StringUtils.hasText(providerAccountId)) {
+            throw new BusinessException(SOCIAL_LOGIN_REQUIRED);
         }
         if (!Boolean.TRUE.equals(request.ageConfirmed()) || !Boolean.TRUE.equals(request.privacyConsented())) {
             throw new BusinessException(CONSENT_REQUIRED);
@@ -43,19 +44,22 @@ public class SubscriberService {
         if (StringUtils.hasText(request.referralCode())) {
             referrer = subscriberRepository.findByInviteToken(request.referralCode())
                     .orElseThrow(() -> new BusinessException(INVALID_REFERRAL_CODE));
-            if (googleSub.equals(referrer.getGoogleSub()) || normalized.equals(referrer.getEmailNormalized())) {
+            boolean sameAccount = provider == referrer.getProvider()
+                    && providerAccountId.equals(referrer.getProviderAccountId());
+            if (sameAccount || normalized.equals(referrer.getEmailNormalized())) {
                 throw new BusinessException(SELF_REFERRAL_NOT_ALLOWED);
             }
         }
-        if (subscriberRepository.existsByGoogleSub(googleSub)) {
-            throw new BusinessException(DUPLICATE_GOOGLE_ACCOUNT);
+        if (subscriberRepository.existsByProviderAndProviderAccountId(provider, providerAccountId)) {
+            throw new BusinessException(DUPLICATE_SOCIAL_ACCOUNT);
         }
         if (subscriberRepository.existsByEmailNormalized(normalized)) {
             throw new BusinessException(DUPLICATE_EMAIL);
         }
         // 추천인은 신규 등록 시에만 지정한다. 기존 관계를 수정하지 않아 순환 추천을 방지한다.
         Subscriber subscriber = Subscriber.builder()
-                .googleSub(googleSub)
+                .provider(provider)
+                .providerAccountId(providerAccountId)
                 .email(verifiedEmail)
                 .emailNormalized(normalized)
                 .referrer(referrer)

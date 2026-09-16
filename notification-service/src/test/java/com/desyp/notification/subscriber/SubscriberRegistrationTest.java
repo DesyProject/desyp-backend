@@ -7,6 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import com.desyp.common.exception.BusinessException;
+import com.desyp.notification.auth.AuthProvider;
 import com.desyp.notification.subscriber.dto.SubscriberRegisterRequest;
 import com.desyp.notification.subscriber.repository.SubscriberRepository;
 import com.desyp.notification.subscriber.service.SubscriberService;
@@ -54,6 +55,22 @@ class SubscriberRegistrationTest {
                 .idToken(token -> token.subject(subject).claim("email", email).claim("email_verified", verified));
     }
 
+    private RequestPostProcessor naver(String id, String email) {
+        return oauth2Login().clientRegistration(ClientRegistration.withRegistrationId("naver")
+                .clientId("test-client").clientSecret("test-secret")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .scope("email")
+                .authorizationUri("https://nid.naver.com/oauth2.0/authorize")
+                .tokenUri("https://nid.naver.com/oauth2.0/token")
+                .userInfoUri("https://openapi.naver.com/v1/nid/me")
+                .userNameAttributeName("id").build())
+                .attributes(attrs -> {
+                    attrs.put("id", id);
+                    attrs.put("email", email);
+                });
+    }
+
     private String body(String email, String referral) {
         return """
                 {"email":"%s","ageConfirmed":true,"privacyConsented":true,"referralCode":%s}
@@ -82,7 +99,7 @@ class SubscriberRegistrationTest {
 
     @Test
     void duplicateGoogleAccountReturnsConflict() throws Exception {
-        service.register("user-1", "first@gmail.com", request("first@gmail.com", null));
+        service.register(AuthProvider.GOOGLE, "user-1", "first@gmail.com", request("first@gmail.com", null));
         mvc.perform(post("/api/subscribers").with(google("user-1", "second@gmail.com", true))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body("second@gmail.com", null)))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.success").value(false));
@@ -90,8 +107,38 @@ class SubscriberRegistrationTest {
     }
 
     @Test
+    void registersViaNaverLogin() throws Exception {
+        mvc.perform(post("/api/subscribers").with(naver("naver-1", "user@naver.com"))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body("user@naver.com", null)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.success").value(true));
+        var saved = repository.findAll().getFirst();
+        assertThat(saved.getProvider()).isEqualTo(AuthProvider.NAVER);
+        assertThat(saved.getProviderAccountId()).isEqualTo("naver-1");
+    }
+
+    @Test
+    void sameRawIdDoesNotCollideAcrossProviders() throws Exception {
+        service.register(AuthProvider.GOOGLE, "same-id", "google-user@gmail.com", request("google-user@gmail.com", null));
+        mvc.perform(post("/api/subscribers").with(naver("same-id", "naver-user@naver.com"))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body("naver-user@naver.com", null)))
+                .andExpect(status().isCreated());
+        assertThat(repository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void duplicateNaverAccountReturnsConflict() throws Exception {
+        service.register(AuthProvider.NAVER, "naver-1", "first@naver.com", request("first@naver.com", null));
+        mvc.perform(post("/api/subscribers").with(naver("naver-1", "second@naver.com"))
+                        .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body("second@naver.com", null)))
+                .andExpect(status().isConflict());
+        assertThat(repository.count()).isEqualTo(1);
+    }
+
+    @Test
     void emailAliasesCannotRegisterTwice() throws Exception {
-        service.register("user-1", "foo.bar@gmail.com", request("foo.bar@gmail.com", null));
+        service.register(AuthProvider.GOOGLE, "user-1", "foo.bar@gmail.com", request("foo.bar@gmail.com", null));
         mvc.perform(post("/api/subscribers").with(google("user-2", "foobar+tag@googlemail.com", true))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body("foobar+tag@googlemail.com", null)))
                 .andExpect(status().isConflict());
@@ -100,8 +147,8 @@ class SubscriberRegistrationTest {
 
     @Test
     void registersWithExistingReferrer() {
-        var first = service.register("first", "first@gmail.com", request("first@gmail.com", null));
-        var second = service.register("second", "second@gmail.com", request("second@gmail.com", first.inviteToken()));
+        var first = service.register(AuthProvider.GOOGLE, "first", "first@gmail.com", request("first@gmail.com", null));
+        var second = service.register(AuthProvider.GOOGLE, "second", "second@gmail.com", request("second@gmail.com", first.inviteToken()));
         assertThat(repository.findById(second.id()).orElseThrow().getReferrer().getId()).isEqualTo(first.id());
     }
 
@@ -115,8 +162,8 @@ class SubscriberRegistrationTest {
 
     @Test
     void rejectsSelfReferral() {
-        var first = service.register("first", "first@gmail.com", request("first@gmail.com", null));
-        assertThatThrownBy(() -> service.register("first", "first@gmail.com", request("first@gmail.com", first.inviteToken())))
+        var first = service.register(AuthProvider.GOOGLE, "first", "first@gmail.com", request("first@gmail.com", null));
+        assertThatThrownBy(() -> service.register(AuthProvider.GOOGLE, "first", "first@gmail.com", request("first@gmail.com", first.inviteToken())))
                 .isInstanceOf(BusinessException.class).hasMessage("자기 자신을 추천할 수 없습니다");
     }
 
@@ -135,7 +182,7 @@ class SubscriberRegistrationTest {
 
     @Test
     void domainAlsoRequiresConsent() {
-        assertThatThrownBy(() -> service.register("user", "user@gmail.com",
+        assertThatThrownBy(() -> service.register(AuthProvider.GOOGLE, "user", "user@gmail.com",
                 new SubscriberRegisterRequest("user@gmail.com", true, false, null)))
                 .isInstanceOf(BusinessException.class);
         assertThat(repository.count()).isZero();
@@ -160,6 +207,11 @@ class SubscriberRegistrationTest {
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
         }
         assertThat(repository.count()).isZero();
+    }
+
+    @Test
+    void apiDocsAreAccessibleWithoutLogin() throws Exception {
+        mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }
 
     @Test
@@ -195,7 +247,7 @@ class SubscriberRegistrationTest {
             ready.countDown();
             if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("start timeout");
             try {
-                service.register("same-user", "same@gmail.com", request("same@gmail.com", null));
+                service.register(AuthProvider.GOOGLE, "same-user", "same@gmail.com", request("same@gmail.com", null));
                 return true;
             } catch (BusinessException exception) {
                 assertThat(exception.getErrorCode().getHttpStatus().value()).isEqualTo(409);
@@ -226,16 +278,16 @@ class SubscriberRegistrationTest {
 
     @Test
     void referralChainAwardsBothSidesAndKeepsCountsSeparate() throws Exception {
-        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
-        var b = service.register("b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
-        service.register("c", "c@gmail.com", request("c@gmail.com", b.inviteToken()));
-        assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
-        assertThat(referrals.myScore("a").referralBonus()).isZero();
-        assertThat(referrals.myScore("b").referralCount()).isEqualTo(1);
-        assertThat(referrals.myScore("b").referralBonus()).isEqualTo(1);
-        assertThat(referrals.myScore("b").totalScore()).isEqualTo(2);
-        assertThat(referrals.myScore("c").referralCount()).isZero();
-        assertThat(referrals.myScore("c").referralBonus()).isEqualTo(1);
+        var a = service.register(AuthProvider.GOOGLE, "a", "a@gmail.com", request("a@gmail.com", null));
+        var b = service.register(AuthProvider.GOOGLE, "b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
+        service.register(AuthProvider.GOOGLE, "c", "c@gmail.com", request("c@gmail.com", b.inviteToken()));
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "a").referralCount()).isEqualTo(1);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "a").referralBonus()).isZero();
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "b").referralCount()).isEqualTo(1);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "b").referralBonus()).isEqualTo(1);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "b").totalScore()).isEqualTo(2);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "c").referralCount()).isZero();
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "c").referralBonus()).isEqualTo(1);
         mvc.perform(get("/api/referrals/me").with(google("b", "b@gmail.com", true)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.referralCount").value(1))
@@ -246,33 +298,33 @@ class SubscriberRegistrationTest {
 
     @Test
     void duplicateRegistrationCannotAwardBonusTwiceOrChangeReferrer() {
-        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
-        var b = service.register("b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
-        var c = service.register("c", "c@gmail.com", request("c@gmail.com", null));
-        assertThatThrownBy(() -> service.register("b", "b@gmail.com", request("b@gmail.com", c.inviteToken())))
+        var a = service.register(AuthProvider.GOOGLE, "a", "a@gmail.com", request("a@gmail.com", null));
+        var b = service.register(AuthProvider.GOOGLE, "b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
+        var c = service.register(AuthProvider.GOOGLE, "c", "c@gmail.com", request("c@gmail.com", null));
+        assertThatThrownBy(() -> service.register(AuthProvider.GOOGLE, "b", "b@gmail.com", request("b@gmail.com", c.inviteToken())))
                 .isInstanceOf(BusinessException.class);
-        assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
-        assertThat(referrals.myScore("b").referralBonus()).isEqualTo(1);
-        assertThat(referrals.myScore("c").totalScore()).isZero();
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "a").referralCount()).isEqualTo(1);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "b").referralBonus()).isEqualTo(1);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "c").totalScore()).isZero();
         assertThat(repository.findById(b.id()).orElseThrow().getReferrer().getId()).isEqualTo(a.id());
     }
 
     @Test
     void unsuccessfulRegistrationDoesNotAwardPoints() {
-        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
-        assertThatThrownBy(() -> service.register("b", "b@gmail.com",
+        var a = service.register(AuthProvider.GOOGLE, "a", "a@gmail.com", request("a@gmail.com", null));
+        assertThatThrownBy(() -> service.register(AuthProvider.GOOGLE, "b", "b@gmail.com",
                 new SubscriberRegisterRequest("b@gmail.com", true, false, a.inviteToken())))
                 .isInstanceOf(BusinessException.class);
-        assertThatThrownBy(() -> service.register("b", "other@gmail.com", request("b@gmail.com", a.inviteToken())))
+        assertThatThrownBy(() -> service.register(AuthProvider.GOOGLE, "b", "other@gmail.com", request("b@gmail.com", a.inviteToken())))
                 .isInstanceOf(BusinessException.class);
-        assertThat(referrals.myScore("a").totalScore()).isZero();
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "a").totalScore()).isZero();
     }
 
     @Test
     void rankingIncludesAllTiesAtRequestedRankAndDoesNotExposeInviteTokens() throws Exception {
-        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
-        service.register("b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
-        service.register("c", "c@gmail.com", request("c@gmail.com", null));
+        var a = service.register(AuthProvider.GOOGLE, "a", "a@gmail.com", request("a@gmail.com", null));
+        service.register(AuthProvider.GOOGLE, "b", "b@gmail.com", request("b@gmail.com", a.inviteToken()));
+        service.register(AuthProvider.GOOGLE, "c", "c@gmail.com", request("c@gmail.com", null));
         mvc.perform(get("/api/admin/referrals/ranking?maxRank=1").with(google("admin-user", "admin@gmail.com", true)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].rank").value(1))
@@ -304,7 +356,7 @@ class SubscriberRegistrationTest {
 
     @Test
     void scoreRequiresRegisteredAccountAndDoesNotAcceptAnotherUserId() throws Exception {
-        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        var a = service.register(AuthProvider.GOOGLE, "a", "a@gmail.com", request("a@gmail.com", null));
         mvc.perform(get("/api/referrals/me")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/referrals/me?googleSub=a").with(google("b", "b@gmail.com", true)))
                 .andExpect(status().isNotFound());
@@ -314,7 +366,7 @@ class SubscriberRegistrationTest {
 
     @Test
     void concurrentReferralsDoNotLosePoints() throws Exception {
-        var a = service.register("a", "a@gmail.com", request("a@gmail.com", null));
+        var a = service.register(AuthProvider.GOOGLE, "a", "a@gmail.com", request("a@gmail.com", null));
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(4)) {
             var tasks = new java.util.ArrayList<java.util.concurrent.Future<?>>();
@@ -322,15 +374,15 @@ class SubscriberRegistrationTest {
                 String subject = "invitee-" + i;
                 tasks.add(executor.submit(() -> {
                     if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("start timeout");
-                    return service.register(subject, subject + "@gmail.com", request(subject + "@gmail.com", a.inviteToken()));
+                    return service.register(AuthProvider.GOOGLE, subject, subject + "@gmail.com", request(subject + "@gmail.com", a.inviteToken()));
                 }));
             }
             start.countDown();
             for (var task : tasks) task.get(20, TimeUnit.SECONDS);
         }
-        assertThat(referrals.myScore("a").referralCount()).isEqualTo(8);
-        assertThat(referrals.myScore("a").referralBonus()).isZero();
-        assertThat(referrals.myScore("a").totalScore()).isEqualTo(8);
-        for (int i = 0; i < 8; i++) assertThat(referrals.myScore("invitee-" + i).referralBonus()).isEqualTo(1);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "a").referralCount()).isEqualTo(8);
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "a").referralBonus()).isZero();
+        assertThat(referrals.myScore(AuthProvider.GOOGLE, "a").totalScore()).isEqualTo(8);
+        for (int i = 0; i < 8; i++) assertThat(referrals.myScore(AuthProvider.GOOGLE, "invitee-" + i).referralBonus()).isEqualTo(1);
     }
 }

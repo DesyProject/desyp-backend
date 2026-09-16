@@ -5,7 +5,7 @@ desyp의 상시 알림 트랙. 사전 등록, 추천 점수와 순위, 이벤트
 
 ## 현재 제품 정책
 
-- 로그인 제공자는 Google·네이버로 계획한다. 현재 구현은 Google OIDC이며 네이버는 후속 작업이다.
+- 로그인 제공자는 Google OIDC·네이버 OAuth2를 지원한다.
 - 소셜 로그인에서 제공한 이메일을 사용하고 연령 확인·개인정보 수집 동의 후 사전 등록한다.
 - **다계정 추가 방지는 제외한다.** 동일 소셜 계정·정규화 이메일 중복 등록은 기존 정책대로 차단한다.
 - 추천 코드는 선택 사항이고 등록 완료 시 한 번 연결한다. 등록 후 추천인 변경은 허용하지 않는다.
@@ -20,7 +20,7 @@ desyp의 상시 알림 트랙. 사전 등록, 추천 점수와 순위, 이벤트
 - Java 21, Spring Boot, PostgreSQL, Flyway
 - 배포 목표: AWS Lambda. 현재 인증은 서버 세션이므로 Lambda/다중 인스턴스의 세션 공유 방식은 배포 전 확정한다.
 - Google OIDC는 `openid`, `email`만 요청한다.
-- 네이버 OAuth2, AWS SES 발송, EventBridge Scheduler 예약 실행은 미구현이다.
+- AWS SES 발송, EventBridge Scheduler 예약 실행은 미구현이다.
 - 초기 규모: 2개월간 낮고 꾸준한 사전 등록 트래픽. 이벤트 당일 응모 고트래픽은 event-entry-service 책임이다.
 
 ## 패키지와 책임
@@ -38,7 +38,7 @@ desyp의 상시 알림 트랙. 사전 등록, 추천 점수와 순위, 이벤트
 `V1__create_subscribers.sql`에 사전 등록 테이블이 있고 `V2__add_referral_bonus.sql`에서 보너스와 제약을 추가한다.
 이미 적용된 마이그레이션을 수정하지 말고 후속 버전 파일을 추가한다.
 
-- `google_sub`: 현재 Google 계정 고유값, UNIQUE. 네이버 도입 시 제공자+계정 식별자로 별도 마이그레이션할 예정이다.
+- `provider`, `provider_account_id`: 로그인 제공자(GOOGLE/NAVER)와 제공자별 계정 식별자. 두 컬럼 조합이 UNIQUE다.
 - `email`, `email_normalized`: 원문 이메일과 UNIQUE 정규화 이메일
 - `referrer_id`: 기존 가입자를 가리키는 자기참조 FK, JPA에서 수정 불가
 - `referral_bonus`: 추천인이 없으면 0, 있으면 1. 생성자가 추천 관계로 결정하며 요청 값으로 받지 않는다.
