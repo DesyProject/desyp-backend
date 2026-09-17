@@ -22,7 +22,7 @@ public class ReferralController {
     @GetMapping("/api/referrals/me")
     public ApiResponse<ReferralScoreResponse> myScore(OAuth2AuthenticationToken authentication) {
         var account = SocialAccount.require(authentication);
-        return ApiResponse.success(referralService.myScore(account.provider(), account.accountId()));
+        return ApiResponse.success(referralService.myScore(account.accountId()));
     }
 
     @GetMapping("/api/admin/referrals/ranking")

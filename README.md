@@ -4,7 +4,7 @@
 
 ## 제품 정책
 
-1. 사용자는 Google 또는 네이버 소셜 로그인 후 이메일을 사전 등록한다.
+1. 사용자는 네이버 소셜 로그인 후 이메일과 휴대전화번호 제공에 동의하고 사전 등록한다.
 2. B가 A의 추천 코드로 등록하면 A는 추천 성공 1점, B는 최초 코드 사용 보너스 1점을 받는다.
 3. **추천 점수 = 실제 추천 인원 수 + 코드 사용 보너스(최대 1점)** 이다.
 4. 최고점자가 여러 명이면 최고점 동률자 중 최종 1등 한 명을 무작위로 추첨한다.
@@ -12,7 +12,7 @@
 6. 운영자가 당첨자에게 직접 연락해 5만 원 이하 상품을 확인하고 발송한다. 상품 선택 API는 만들지 않는다.
 7. 메인 이벤트 시작 1시간 전에 사전 등록자에게 이메일을 발송한다.
 
-다계정 추가 방지는 제외한다. 동일 소셜 계정·정규화 이메일 중복, 자기추천, 등록 후 추천인 변경은 차단한다.
+사전 등록 인원으로 메인 이벤트 참여 규모를 예측하기 위해 로그인 제공자를 네이버로 제한한다. 네이버 계정이 달라도 정규화된 휴대전화번호가 같으면 한 사람으로 보고 중복 등록을 차단한다. 동일 네이버 계정·정규화 이메일 중복, 자기추천, 등록 후 추천인 변경도 차단한다.
 
 ### 상품 목록
 
@@ -41,7 +41,8 @@
 
 | 영역 | 상태 |
 | --- | --- |
-| Google·네이버 로그인 | 구현 완료 |
+| 네이버 단일 로그인 | 구현 완료 |
+| 휴대전화번호 저장·중복 차단 | 구현 완료 |
 | 이메일 사전 등록 | 구현 완료 |
 | 추천 점수·공동 순위 | 구현 완료 |
 | SES 알림 | 관리자 수동 트리거 구현 완료 |
@@ -63,12 +64,11 @@
 Java 21과 PostgreSQL을 준비하고 다음 환경 변수를 설정한다.
 
 - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`
 - `SES_SENDER_EMAIL`
 - `SPRING_PROFILES_ACTIVE=oauth`
 
-Google·네이버 Redirect URI는 `{서비스 외부 주소}/login/oauth2/code/{google|naver}`다. 운영에서는 HTTPS와 Secure 세션 쿠키를 사용하고, 로컬 HTTP에서만 `SESSION_COOKIE_SECURE=false`를 쓴다.
+네이버 Redirect URI는 `{서비스 외부 주소}/login/oauth2/code/naver`다. 네이버 개발자센터에서 이메일과 휴대전화번호 제공 권한을 신청·활성화해야 한다. 운영에서는 HTTPS와 Secure 세션 쿠키를 사용하고, 로컬 HTTP에서만 `SESSION_COOKIE_SECURE=false`를 쓴다.
 
 ```sh
 ./gradlew :notification-service:bootRun
@@ -78,7 +78,7 @@ Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
 
 ## API 흐름
 
-1. `GET /oauth2/authorization/google` 또는 `/oauth2/authorization/naver`로 로그인
+1. `GET /oauth2/authorization/naver`로 로그인
 2. `GET /api/csrf` 응답으로 CSRF 헤더 구성
 3. 같은 세션으로 API 호출
 
@@ -87,10 +87,10 @@ Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
 `POST /api/subscribers`
 
 ```json
-{"email":"로그인 이메일","ageConfirmed":true,"privacyConsented":true,"referralCode":null}
+{"ageConfirmed":true,"privacyConsented":true,"referralCode":null}
 ```
 
-성공 시 `201`과 가입 ID·추천 코드를 반환한다. 추천 코드는 선택 사항이며 등록 후 변경할 수 없다.
+이메일과 휴대전화번호는 요청 본문이 아니라 네이버 프로필에서만 가져온다. 휴대전화번호는 숫자 형식으로 정규화해 고유하게 저장한다. 성공 시 `201`과 가입 ID·추천 코드를 반환하며 추천 코드는 등록 후 변경할 수 없다.
 
 ### 내 추천 점수
 
@@ -102,7 +102,7 @@ Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
 
 `GET /api/admin/referrals/ranking?maxRank=10`
 
-`ADMIN_GOOGLE_SUBS` 허용 목록의 관리자만 사용할 수 있다. 공동 순위는 `1, 1, 3` 방식이며 경계의 동점자를 모두 반환한다. 현재는 실시간 순위 조회만 제공한다.
+`ADMIN_NAVER_ACCOUNT_IDS` 허용 목록의 관리자만 사용할 수 있다. 공동 순위는 `1, 1, 3` 방식이며 경계의 동점자를 모두 반환한다. 현재는 실시간 순위 조회만 제공한다.
 
 ### 이벤트 알림 메일
 
@@ -116,4 +116,4 @@ Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
 ./gradlew build
 ```
 
-테스트는 외부 계정 없이 H2 PostgreSQL 모드로 실행한다. 실제 PostgreSQL, Google·네이버 로그인, SES 연결은 운영 환경에서 별도로 검증해야 한다.
+테스트는 외부 계정 없이 H2 PostgreSQL 모드로 실행한다. 실제 PostgreSQL, 네이버 로그인 프로필 권한, SES 연결은 운영 환경에서 별도로 검증해야 한다.

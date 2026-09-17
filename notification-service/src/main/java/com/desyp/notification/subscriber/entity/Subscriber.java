@@ -44,6 +44,9 @@ public class Subscriber {
     @Column(name = "email_normalized", nullable = false, unique = true)
     private String emailNormalized;
 
+    @Column(name = "phone_number", unique = true, updatable = false)
+    private String phoneNumber;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "referrer_id", updatable = false)
     private Subscriber referrer;
@@ -67,12 +70,13 @@ public class Subscriber {
     private OffsetDateTime notifiedAt;
 
     @Builder
-    private Subscriber(AuthProvider provider, String providerAccountId, String email, String emailNormalized,
+    private Subscriber(AuthProvider provider, String providerAccountId, String email, String emailNormalized, String phoneNumber,
                         Subscriber referrer, String inviteToken, boolean ageConfirmed, OffsetDateTime consentAt) {
         this.provider = provider;
         this.providerAccountId = providerAccountId;
         this.email = email;
         this.emailNormalized = emailNormalized;
+        this.phoneNumber = phoneNumber;
         this.referrer = referrer;
         this.referralBonus = referrer == null ? 0 : 1;
         this.inviteToken = inviteToken;

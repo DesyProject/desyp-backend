@@ -7,15 +7,12 @@ import com.desyp.common.exception.BusinessException;
 
 import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.SOCIAL_LOGIN_REQUIRED;
 import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.VERIFIED_EMAIL_REQUIRED;
+import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.VERIFIED_PHONE_REQUIRED;
 
-public record SocialAccount(AuthProvider provider, String accountId, String email) {
+public record SocialAccount(String accountId, String email, String phoneNumber) {
 
     public static SocialAccount require(OAuth2AuthenticationToken authentication) {
         String registrationId = authentication == null ? null : authentication.getAuthorizedClientRegistrationId();
-        if ("google".equals(registrationId)) {
-            var user = GoogleAccount.require(authentication);
-            return new SocialAccount(AuthProvider.GOOGLE, user.getSubject(), user.getEmail());
-        }
         if ("naver".equals(registrationId)) {
             return requireNaver(authentication);
         }
@@ -29,6 +26,7 @@ public record SocialAccount(AuthProvider provider, String accountId, String emai
         var user = authentication.getPrincipal();
         String id = user.getAttribute("id");
         String email = user.getAttribute("email");
+        String phoneNumber = user.getAttribute("mobile");
         if (!StringUtils.hasText(id)) {
             throw new BusinessException(SOCIAL_LOGIN_REQUIRED);
         }
@@ -36,6 +34,9 @@ public record SocialAccount(AuthProvider provider, String accountId, String emai
         if (!StringUtils.hasText(email)) {
             throw new BusinessException(VERIFIED_EMAIL_REQUIRED);
         }
-        return new SocialAccount(AuthProvider.NAVER, id, email);
+        if (!StringUtils.hasText(phoneNumber)) {
+            throw new BusinessException(VERIFIED_PHONE_REQUIRED);
+        }
+        return new SocialAccount(id, email, phoneNumber);
     }
 }

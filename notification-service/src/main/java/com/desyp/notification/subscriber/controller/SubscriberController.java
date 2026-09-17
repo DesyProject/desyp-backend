@@ -26,7 +26,6 @@ public class SubscriberController {
             OAuth2AuthenticationToken authentication,
             @Valid @RequestBody SubscriberRegisterRequest request) {
         var account = SocialAccount.require(authentication);
-        return ApiResponse.success(subscriberService.register(
-                account.provider(), account.accountId(), account.email(), request));
+        return ApiResponse.success(subscriberService.register(account, request));
     }
 }

@@ -47,7 +47,7 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 ### 책임과 구현 상태
 
 - `subscriber`: 사전 등록, 동의, 중복 검증, 추천 관계와 보너스 저장
-- `auth`: Google·네이버 계정 확인, 관리자 허용 목록
+- `auth`: 네이버 계정·프로필 확인, 관리자 허용 목록
 - `referral`: 내 점수와 관리자 공동 순위 조회
 - `mail`: 관리자 트리거 기반 SES 발송과 `notified_at` 중복 방지
 - `global`: 세션, CSRF, 보안 설정
@@ -58,7 +58,9 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 
 적용된 Flyway 마이그레이션은 수정하지 않고 새 버전을 추가한다.
 
-- `(provider, provider_account_id)`와 `email_normalized`는 각각 고유해야 한다.
+- 신규 인증과 등록은 네이버만 허용한다. `GOOGLE` enum 값은 기존 V1~V3 데이터 호환용이며 신규 등록에 사용하지 않는다.
+- `(provider, provider_account_id)`, `email_normalized`, `phone_number`는 각각 고유해야 한다.
+- `phone_number`는 네이버 `mobile` 프로필 값에서 숫자 형식으로 정규화하며 요청 본문으로 받지 않는다.
 - `referrer_id`는 생성 후 변경하지 않으며 자기 자신을 가리킬 수 없다.
 - `referral_bonus`는 추천인이 있으면 1, 없으면 0이며 요청 값으로 받지 않는다.
 - 실제 추천 인원은 `referrer_id` 관계를 조회 시 `COUNT`한다. 누적 카운터를 별도로 저장하지 않는다.
@@ -66,13 +68,15 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 - 이메일은 소문자화, `+` 별칭 제거, Gmail 점 제거, `googlemail.com` 통합 후 중복을 검사한다.
 - 메일 성공 시에만 `notified_at`을 기록한다.
 
-내 점수는 로그인 계정으로만 조회한다. 관리자 API는 `ADMIN_GOOGLE_SUBS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 관리자 전용이다.
+내 점수는 로그인 계정으로만 조회한다. 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일과 휴대전화번호가 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다. 이메일·휴대전화번호·네이버 식별자는 로그에 남기지 않는다.
 
 ### 배포 전 확인
 
 - Lambda 또는 다중 인스턴스에서 사용할 세션 공유 방식
 - EventBridge Scheduler의 정확한 이벤트 시작 시각과 1시간 전 실행
-- 실제 PostgreSQL, Google·네이버 OAuth, SES 연결
+- 네이버 개발자센터의 이메일·휴대전화번호 제공 권한과 실제 OAuth 응답
+- 기존 Google 가입 데이터의 운영 전 정리 여부. V5는 데이터 손실을 피하기 위해 기존 행의 `phone_number`를 NULL로 유지한다.
+- 실제 PostgreSQL과 SES 연결
 - 메일 실패 재시도와 발송 이력
 - 추천 집계 마감, 감사 가능한 동률 추첨과 결과 스냅샷
 
