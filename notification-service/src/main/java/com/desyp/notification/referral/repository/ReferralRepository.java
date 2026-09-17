@@ -14,19 +14,19 @@ public interface ReferralRepository extends Repository<Subscriber, Long> {
                    COUNT(c.id) AS referralCount, s.referral_bonus AS referralBonus,
                    COUNT(c.id) + s.referral_bonus AS totalScore
             FROM subscribers s LEFT JOIN subscribers c ON c.referrer_id = s.id
-            WHERE s.google_sub = :googleSub
+            WHERE s.provider = :provider AND s.provider_account_id = :providerAccountId
             GROUP BY s.id, s.invite_token, s.referral_bonus
             """, nativeQuery = true)
-    Optional<Score> findScore(@Param("googleSub") String googleSub);
+    Optional<Score> findScore(@Param("provider") String provider, @Param("providerAccountId") String providerAccountId);
 
     @Query(value = """
             SELECT ranked.* FROM (
                 SELECT RANK() OVER (ORDER BY COUNT(c.id) + s.referral_bonus DESC) AS ranking,
-                       s.id AS subscriberId, s.email AS email,
+                       s.id AS subscriberId, s.email AS email, s.phone_number AS phoneNumber,
                        COUNT(c.id) AS referralCount, s.referral_bonus AS referralBonus,
                        COUNT(c.id) + s.referral_bonus AS totalScore
                 FROM subscribers s LEFT JOIN subscribers c ON c.referrer_id = s.id
-                GROUP BY s.id, s.email, s.referral_bonus
+                GROUP BY s.id, s.email, s.phone_number, s.referral_bonus
             ) ranked
             WHERE ranked.ranking <= :maxRank
             ORDER BY ranked.ranking, ranked.subscriberId
@@ -45,6 +45,7 @@ public interface ReferralRepository extends Repository<Subscriber, Long> {
         long getRanking();
         Long getSubscriberId();
         String getEmail();
+        String getPhoneNumber();
         long getReferralCount();
         int getReferralBonus();
         long getTotalScore();
