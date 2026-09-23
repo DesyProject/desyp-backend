@@ -11,6 +11,14 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  session:
+    jdbc:
+      initialize-schema: never
+desyp:
+  frontend:
+    origin: https://www.desyp.site
+  registration:
+    end-at: 2999-12-31T23:59:59+09:00
 logging:
   level:
     org.hibernate.orm.jdbc.error: OFF

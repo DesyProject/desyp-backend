@@ -27,7 +27,7 @@ class RegistrationMailTest {
     }
 
     private SubscriberRegisterRequest request() {
-        return new SubscriberRegisterRequest(true, true, null);
+        return new SubscriberRegisterRequest(true, true, true, null);
     }
 
     @Test

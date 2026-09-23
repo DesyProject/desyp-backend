@@ -31,7 +31,7 @@ public class ReferralService {
         }
         return referralRepository.findRanking(maxRank).stream()
                 .map(score -> new ReferralRankingResponse(score.getRanking(), score.getSubscriberId(),
-                        score.getEmail(), score.getPhoneNumber(), score.getReferralCount(),
+                        score.getEmail(), score.getReferralCount(),
                         score.getReferralBonus(), score.getTotalScore()))
                 .toList();
     }
