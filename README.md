@@ -111,6 +111,7 @@ Java 21과 PostgreSQL을 준비하고 다음 환경 변수를 설정한다.
 
 - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
 - `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`
+- `NAVER_REDIRECT_URI`: 운영 `https://api.desyp.site/auth/naver/callback`, 로컬 `http://localhost:8080/auth/naver/callback`. 네이버 개발자센터 Callback URL과 같아야 한다
 - `SES_SENDER_EMAIL`
 - `SPRING_PROFILES_ACTIVE=oauth`
 - `FRONTEND_ORIGIN`: 기본 `https://www.desyp.site`. 로컬 프런트는 `http://localhost:5173`

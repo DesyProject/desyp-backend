@@ -8,7 +8,8 @@ spring:
             client-secret: ${NAVER_CLIENT_SECRET}
             client-name: Naver
             authorization-grant-type: authorization_code
-            redirect-uri: "{baseUrl}/auth/{registrationId}/callback"
+            # 요청 헤더로 계산하지 않고 고정한다. 예: https://api.desyp.site/auth/naver/callback
+            redirect-uri: ${NAVER_REDIRECT_URI}
             scope: email,mobile
         provider:
           naver:

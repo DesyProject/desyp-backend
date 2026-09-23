@@ -80,7 +80,7 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 
 - Spring Session JDBC의 만료 세션 정리(`cleanup-cron`, 1분 주기)는 Lambda가 요청 사이에 멈추면 실행되지 않는다. 만료 세션은 조회 시 거부되지만 행이 쌓이므로 별도 정리 작업을 정한다
 - API Gateway·WAF의 사전 등록 요청 스로틀링(`429`)
-- `server.forward-headers-strategy=framework`로 `X-Forwarded-*`를 신뢰하므로 애플리케이션은 API Gateway를 거쳐서만 접근 가능해야 한다. 첫 배포 후 네이버 redirect-uri가 `https://api.desyp.site/auth/naver/callback`으로 나가는지 확인한다
+- 네이버 redirect-uri는 `X-Forwarded-*` 위조를 피하려고 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Lambda 함수 URL은 만들지 않거나 IAM 인증을 걸고, Lambda 실행 권한은 API Gateway에만 준다
 - 이벤트 종료 후 30일 내 개인정보 파기
 - EventBridge Scheduler의 정확한 이벤트 시작 시각과 1시간 전 실행
 - 네이버 개발자센터의 이메일·휴대전화번호 제공 권한과 실제 OAuth 응답
