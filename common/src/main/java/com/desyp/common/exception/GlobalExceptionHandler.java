@@ -3,6 +3,7 @@ package com.desyp.common.exception;
 import com.desyp.common.response.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -33,6 +34,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
+        // 415, 405 같은 Spring MVC 요청 오류는 원래 상태 코드를 유지한다.
+        if (e instanceof ErrorResponse errorResponse && errorResponse.getStatusCode().is4xxClientError()) {
+            return ResponseEntity.status(errorResponse.getStatusCode()).body(ApiResponse.error("요청 형식을 확인해주세요"));
+        }
         log.error("Unhandled exception type: {}", e.getClass().getSimpleName());
         return ResponseEntity
             .internalServerError()

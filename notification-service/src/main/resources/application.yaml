@@ -9,12 +9,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-server:
-  servlet:
-    session:
-      cookie:
-        http-only: true
-        same-site: lax
+  session:
+    jdbc:
+      # 스키마는 Flyway V7이 관리한다.
+      initialize-schema: never
 logging:
   level:
     # UNIQUE 위반의 DB 오류 메시지에 이메일·휴대전화번호·소셜 식별자가 포함될 수 있다.
@@ -24,3 +22,8 @@ desyp:
     naver-account-ids: ${ADMIN_NAVER_ACCOUNT_IDS:}
   mail:
     sender-email: ${SES_SENDER_EMAIL:}
+  frontend:
+    # 로그인 후 return_to 허용 범위와 CORS 허용 Origin. 로컬 개발은 http://localhost:5173
+    origin: ${FRONTEND_ORIGIN:https://www.desyp.site}
+  registration:
+    end-at: ${REGISTRATION_END_AT:2026-10-14T23:59:59+09:00}

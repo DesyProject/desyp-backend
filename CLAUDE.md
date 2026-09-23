@@ -47,12 +47,12 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 ### 책임과 구현 상태
 
 - `subscriber`: 사전 등록, 동의, 중복 검증, 추천 관계와 보너스 저장
-- `auth`: 네이버 계정·프로필 확인, 관리자 허용 목록
+- `auth`: 네이버 로그인 시작·콜백 리다이렉트, 계정·프로필 확인, 관리자 허용 목록
 - `referral`: 내 점수와 관리자 공동 순위 조회
 - `mail`: 관리자 트리거 기반 SES 발송과 `notified_at` 중복 방지
-- `global`: 세션, CSRF, 보안 설정
+- `global`: 세션, CSRF, CORS, 보안 설정
 
-사전 등록·점수·순위·관리자 메일 트리거는 구현됐다. 최고점 동률 추첨, 결과 스냅샷, 공개 결과, EventBridge Scheduler는 미구현이다.
+사전 등록·마감·점수·순위·관리자 메일 트리거는 구현됐다. 최고점 동률 추첨, 결과 스냅샷, 공개 결과, EventBridge Scheduler, 429 스로틀링, 30일 파기는 미구현이다.
 
 ### 데이터 규칙
 
@@ -60,7 +60,9 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 
 - 신규 인증과 등록은 네이버만 허용한다. `GOOGLE` enum 값은 기존 V1~V3 데이터 호환용이며 신규 등록에 사용하지 않는다.
 - `(provider, provider_account_id)`, `email_normalized`, `phone_number`는 각각 고유해야 한다.
-- `phone_number`는 네이버 `mobile` 프로필 값에서 숫자 형식으로 정규화하며 요청 본문으로 받지 않는다.
+- `phone_number`는 네이버 `mobile` 프로필 값에서 숫자 형식으로 정규화하며 요청 본문으로 받지 않는다. 중복 확인에만 쓰고 어떤 API 응답에도 포함하지 않는다.
+- 추천인은 `referrerEmail`을 정규화해 `email_normalized`로 찾는다. `invite_token`은 기존 스키마 호환용이며 추천에 쓰지 않는다.
+- 동의 3종(`age_confirmed`, `privacy_agreed`, `marketing_agreed`)은 모두 필수이며 `consent_at`에 동의 시각을 기록한다. 알림 메일은 `marketing_agreed`인 등록자에게만 보낸다.
 - `referrer_id`는 생성 후 변경하지 않으며 자기 자신을 가리킬 수 없다.
 - `referral_bonus`는 추천인이 있으면 1, 없으면 0이며 요청 값으로 받지 않는다.
 - 실제 추천 인원은 `referrer_id` 관계를 조회 시 `COUNT`한다. 누적 카운터를 별도로 저장하지 않는다.
@@ -68,11 +70,18 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 - 이메일은 소문자화, `+` 별칭 제거, Gmail 점 제거, `googlemail.com` 통합 후 중복을 검사한다.
 - 메일 성공 시에만 `notified_at`을 기록한다.
 
-내 점수는 로그인 계정으로만 조회한다. 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일과 휴대전화번호가 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다. 이메일·휴대전화번호·네이버 식별자는 로그에 남기지 않는다.
+내 점수는 로그인 계정으로만 조회한다. 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
+
+세션은 Spring Session JDBC로 PostgreSQL `SPRING_SESSION` 테이블(V7)에 저장해 Lambda 인스턴스 간에 공유한다. 세션 쿠키 속성(`HttpOnly`, `SameSite=Lax`, `Secure`)은 Boot 속성이 내장 서버에서만 적용되므로 `SecurityConfig`의 `CookieSerializer`에서 지정한다.
+
+`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`는 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·휴대전화번호·네이버 식별자는 로그에 남기지 않는다.
 
 ### 배포 전 확인
 
-- Lambda 또는 다중 인스턴스에서 사용할 세션 공유 방식
+- Spring Session JDBC의 만료 세션 정리(`cleanup-cron`, 1분 주기)는 Lambda가 요청 사이에 멈추면 실행되지 않는다. 만료 세션은 조회 시 거부되지만 행이 쌓이므로 별도 정리 작업을 정한다
+- API Gateway·WAF의 사전 등록 요청 스로틀링(`429`)
+- 네이버 redirect-uri는 `X-Forwarded-*` 위조를 피하려고 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Lambda 함수 URL은 만들지 않거나 IAM 인증을 걸고, Lambda 실행 권한은 API Gateway에만 준다
+- 이벤트 종료 후 30일 내 개인정보 파기
 - EventBridge Scheduler의 정확한 이벤트 시작 시각과 1시간 전 실행
 - 네이버 개발자센터의 이메일·휴대전화번호 제공 권한과 실제 OAuth 응답
 - 기존 Google 가입 데이터의 운영 전 정리 여부. V5는 데이터 손실을 피하기 위해 기존 행의 `phone_number`를 NULL로 유지한다.
@@ -105,7 +114,7 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 
 ## 프런트엔드와 인프라
 
-- 정적 이벤트 페이지는 비공개 S3 버킷과 CloudFront OAC로 제공한다.
+- 사전 등록 페이지만 Vercel에 배포한다([desyp-event](https://github.com/DesyProject/desyp-event)). 메인 이벤트 정적 페이지는 비공개 S3 버킷과 CloudFront OAC로 제공한다.
 - S3 Block Public Access를 유지하고 CloudFront만 읽을 수 있게 한다.
 - 정적 파일명에는 콘텐츠 해시를 쓰고 `index.html` TTL은 짧게 둔다.
 - 로그인·응모 API는 별도 도메인으로 분리하고 정적 캐시에 넣지 않는다.
