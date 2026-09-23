@@ -9,16 +9,16 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class AdminAccess {
-    private final List<String> googleSubjects;
+    private final List<String> naverAccountIds;
 
-    public AdminAccess(@Value("${desyp.admin.google-subs:}") List<String> googleSubjects) {
-        this.googleSubjects = List.copyOf(googleSubjects);
+    public AdminAccess(@Value("${desyp.admin.naver-account-ids:}") List<String> naverAccountIds) {
+        this.naverAccountIds = List.copyOf(naverAccountIds);
     }
 
     public boolean isAllowed(Authentication authentication) {
         if (!(authentication instanceof OAuth2AuthenticationToken token)) return false;
         try {
-            return googleSubjects.contains(GoogleAccount.require(token).getSubject());
+            return naverAccountIds.contains(SocialAccount.require(token).accountId());
         } catch (BusinessException exception) {
             return false;
         }

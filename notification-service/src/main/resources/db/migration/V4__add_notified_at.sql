@@ -1,0 +1,1 @@
+ALTER TABLE subscribers ADD COLUMN notified_at TIMESTAMP WITH TIME ZONE;

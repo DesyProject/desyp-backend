@@ -5,7 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
-import com.desyp.notification.auth.GoogleAccount;
+import com.desyp.notification.auth.SocialAccount;
 import com.desyp.common.response.ApiResponse;
 import com.desyp.notification.subscriber.dto.SubscriberRegisterRequest;
 import com.desyp.notification.subscriber.dto.SubscriberRegisterResponse;
@@ -25,7 +25,7 @@ public class SubscriberController {
     public ApiResponse<SubscriberRegisterResponse> register(
             OAuth2AuthenticationToken authentication,
             @Valid @RequestBody SubscriberRegisterRequest request) {
-        var user = GoogleAccount.require(authentication);
-        return ApiResponse.success(subscriberService.register(user.getSubject(), user.getEmail(), request));
+        var account = SocialAccount.require(authentication);
+        return ApiResponse.success(subscriberService.register(account, request));
     }
 }

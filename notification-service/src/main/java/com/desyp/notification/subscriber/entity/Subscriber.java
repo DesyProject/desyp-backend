@@ -4,6 +4,8 @@ import java.time.OffsetDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -11,6 +13,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import com.desyp.notification.auth.AuthProvider;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -27,14 +31,21 @@ public class Subscriber {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "google_sub", nullable = false, unique = true)
-    private String googleSub;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, updatable = false)
+    private AuthProvider provider;
+
+    @Column(name = "provider_account_id", nullable = false, updatable = false)
+    private String providerAccountId;
 
     @Column(nullable = false)
     private String email;
 
     @Column(name = "email_normalized", nullable = false, unique = true)
     private String emailNormalized;
+
+    @Column(name = "phone_number", unique = true, updatable = false)
+    private String phoneNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "referrer_id", updatable = false)
@@ -55,16 +66,25 @@ public class Subscriber {
     @Column(name = "created_at", insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "notified_at")
+    private OffsetDateTime notifiedAt;
+
     @Builder
-    private Subscriber(String googleSub, String email, String emailNormalized, Subscriber referrer,
-                        String inviteToken, boolean ageConfirmed, OffsetDateTime consentAt) {
-        this.googleSub = googleSub;
+    private Subscriber(AuthProvider provider, String providerAccountId, String email, String emailNormalized, String phoneNumber,
+                        Subscriber referrer, String inviteToken, boolean ageConfirmed, OffsetDateTime consentAt) {
+        this.provider = provider;
+        this.providerAccountId = providerAccountId;
         this.email = email;
         this.emailNormalized = emailNormalized;
+        this.phoneNumber = phoneNumber;
         this.referrer = referrer;
         this.referralBonus = referrer == null ? 0 : 1;
         this.inviteToken = inviteToken;
         this.ageConfirmed = ageConfirmed;
         this.consentAt = consentAt;
+    }
+
+    public void markNotified(OffsetDateTime notifiedAt) {
+        this.notifiedAt = notifiedAt;
     }
 }
