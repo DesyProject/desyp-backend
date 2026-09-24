@@ -94,7 +94,8 @@ entryButton.addEventListener('click', () =>
 | 메인 이벤트 페이지 | 비공개 S3 + CloudFront OAC 사용 확정 |
 | 사전 등록 마감(410) | 구현 완료 |
 | 세션 공유 | Spring Session JDBC(PostgreSQL) 구현 완료 |
-| 과도한 요청 차단(429) | 미구현. API Gateway·WAF 스로틀링으로 처리 예정 |
+| 과도한 요청 차단(429) | Nginx 설정 작성(`deploy/nginx.conf`), 운영 적용 전 |
+| EC2 배포 | 설정 작성(`deploy/`, `.github/workflows/deploy.yml`), 서버 미구축 |
 | 이벤트 종료 후 30일 내 파기 | 미구현 |
 
 ## 프로젝트 구성
@@ -123,7 +124,67 @@ Java 21과 PostgreSQL을 준비하고 다음 환경 변수를 설정한다.
 ./gradlew :notification-service:bootRun
 ```
 
-Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
+Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다. 운영 서버는 systemd 설정에서 API 문서를 끈다.
+
+## EC2 배포
+
+`notification-service`는 EC2 한 대에서 `Nginx(HTTPS·429) → Spring Boot(127.0.0.1:8080)`로 운영한다. 설정 파일은 `deploy/`에 있다.
+
+### 서버 초기 설정 (한 번만)
+
+Ubuntu 26.04 LTS, t3.micro(메모리 1GB) 한 대에 PostgreSQL을 함께 설치하는 기준이다. SSH 사용자는 `ubuntu`다.
+
+1. 탄력적 IP를 인스턴스에 연결한다. 자동 할당 공인 IP는 중지 후 시작하면 바뀐다.
+2. 보안 그룹은 22·80·443만 연다. 8080과 5432는 열지 않는다. 22는 GitHub Actions 배포 때문에 공개하며 키 인증만 허용한다.
+3. SES 발송 권한이 있는 IAM 역할을 인스턴스에 연결한다. 액세스 키는 서버에 두지 않는다.
+4. 메모리가 1GB라 스왑 2GB를 추가한다.
+   ```sh
+   sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+   sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile none swap defaults 0 0' | sudo tee -a /etc/fstab
+   ```
+5. 패키지와 실행 사용자를 준비한다.
+   ```sh
+   sudo apt-get update
+   sudo apt-get install -y openjdk-21-jre-headless nginx certbot postgresql
+   sudo useradd --system --home /opt/desyp --shell /usr/sbin/nologin desyp
+   sudo install -d -o desyp -g desyp /opt/desyp
+   ```
+6. DB를 만든다. Ubuntu PostgreSQL은 기본으로 localhost에서만 접속을 받고 TCP 접속에 비밀번호(`scram-sha-256`)를 요구한다. 설치 후 확인한다.
+   ```sh
+   sudo grep -vE '^\s*(#|$)' /etc/postgresql/18/main/pg_hba.conf   # host 줄이 scram-sha-256인지 확인
+   sudo -u postgres psql -c "CREATE ROLE desyp LOGIN PASSWORD '<DB 비밀번호>'"
+   sudo -u postgres psql -c "CREATE DATABASE desyp OWNER desyp"
+   ```
+   테이블은 앱 기동 시 Flyway가 만든다.
+7. `deploy/notification.env.example`을 참고해 `/etc/desyp/notification.env`를 만들고 `chmod 600`한다. `DB_PASSWORD`는 6번에서 정한 값이다.
+8. `api.desyp.site` DNS A 레코드를 탄력적 IP로 연결한 뒤 인증서를 받는다. 갱신 때도 같은 훅이 쓰인다.
+   ```sh
+   sudo certbot certonly --standalone -d api.desyp.site \
+     --pre-hook "systemctl stop nginx" --post-hook "systemctl start nginx"
+   ```
+9. 로컬에서 `scp -r deploy ubuntu@<탄력적 IP>:~/`로 설정 파일을 올린 뒤 적용한다. jar는 첫 자동 배포가 올린다.
+   ```sh
+   sudo rm -f /etc/nginx/sites-enabled/default
+   sudo cp ~/deploy/nginx.conf /etc/nginx/conf.d/desyp-api.conf
+   sudo cp ~/deploy/desyp-notification.service /etc/systemd/system/
+   sudo nginx -t && sudo systemctl reload nginx
+   sudo systemctl daemon-reload && sudo systemctl enable desyp-notification
+   ```
+10. 백업은 Amazon Data Lifecycle Manager로 EBS 볼륨 일일 스냅샷을 만든다. 스냅샷에도 개인정보가 있으므로 보관은 7일로 두고, 이벤트 종료 후 30일 내 파기 대상에 포함한다.
+
+### 자동 배포
+
+`main`에 push되면 `.github/workflows/deploy.yml`이 빌드·테스트 후 jar를 올리고 서비스를 재시작한다. 비로그인 `/api/me`가 `401`을 반환하면 기동 완료로 본다. 저장소 Secrets에 다음 값을 등록한다.
+
+| Secret | 값 |
+| --- | --- |
+| `EC2_HOST` | EC2 공인 IP 또는 도메인 |
+| `EC2_USER` | SSH 사용자 `ubuntu` |
+| `EC2_SSH_KEY` | 배포 전용 SSH 개인 키 |
+| `EC2_KNOWN_HOSTS` | `ssh-keyscan <EC2_HOST>` 결과. 호스트 키를 고정한다 |
+
+직전 jar는 `/opt/desyp/notification-service.jar.prev`에 남는다. 롤백은 이 파일을 `notification-service.jar`로 복사한 뒤 서비스를 재시작한다.
 
 ## API 흐름
 
