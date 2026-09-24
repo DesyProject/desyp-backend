@@ -81,6 +81,7 @@ public class SecurityConfig {
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/me", config);
         source.registerCorsConfiguration("/api/pre-registrations", config);
+        source.registerCorsConfiguration("/api/referrals/me", config);
         return source;
     }
 }

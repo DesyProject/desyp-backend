@@ -19,7 +19,7 @@ public enum SubscriberErrorCode implements BaseErrorCode {
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "SUBSCRIBER_001", "이미 등록된 이메일입니다"),
     DUPLICATE_SOCIAL_ACCOUNT(HttpStatus.CONFLICT, "SUBSCRIBER_002", "이미 등록된 계정입니다"),
     DUPLICATE_PHONE(HttpStatus.CONFLICT, "SUBSCRIBER_011", "이미 등록된 휴대전화번호입니다"),
-    REFERRER_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIBER_003", "이 이메일로 사전등록한 사람을 찾을 수 없습니다. 추천인 이메일을 다시 확인해주세요"),
+    REFERRER_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIBER_003", "유효하지 않은 추천 코드입니다. 추천 코드를 다시 확인해주세요"),
     REGISTRATION_CLOSED(HttpStatus.GONE, "SUBSCRIBER_012", "사전등록이 마감되었습니다"),
     SUBSCRIBER_NOT_FOUND(HttpStatus.NOT_FOUND, "SUBSCRIBER_005", "구독자를 찾을 수 없습니다");
 

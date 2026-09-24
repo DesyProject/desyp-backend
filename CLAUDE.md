@@ -61,7 +61,7 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 - 신규 인증과 등록은 네이버만 허용한다. `GOOGLE` enum 값은 기존 V1~V3 데이터 호환용이며 신규 등록에 사용하지 않는다.
 - `(provider, provider_account_id)`, `email_normalized`, `phone_number`는 각각 고유해야 한다.
 - `phone_number`는 네이버 `mobile` 프로필 값에서 숫자 형식으로 정규화하며 요청 본문으로 받지 않는다. 중복 확인에만 쓰고 어떤 API 응답에도 포함하지 않는다.
-- 추천인은 `referrerEmail`을 정규화해 `email_normalized`로 찾는다. `invite_token`은 기존 스키마 호환용이며 추천에 쓰지 않는다.
+- 추천인은 요청의 `referralCode`로 `invite_token`을 찾아 결정한다. 이메일과 휴대전화번호는 추천 식별자로 사용하지 않는다.
 - 동의 3종(`age_confirmed`, `privacy_agreed`, `marketing_agreed`)은 모두 필수이며 `consent_at`에 동의 시각을 기록한다. 알림 메일은 `marketing_agreed`인 등록자에게만 보낸다.
 - `referrer_id`는 생성 후 변경하지 않으며 자기 자신을 가리킬 수 없다.
 - `referral_bonus`는 추천인이 있으면 1, 없으면 0이며 요청 값으로 받지 않는다.
@@ -79,6 +79,7 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 ### 배포 전 확인
 
 - Spring Session JDBC의 만료 세션 정리(`cleanup-cron`, 1분 주기)는 Lambda가 요청 사이에 멈추면 실행되지 않는다. 만료 세션은 조회 시 거부되지만 행이 쌓이므로 별도 정리 작업을 정한다
+- EventBridge 연동 전에 메일 발송 상태를 별도 테이블로 관리한다. 수신자·이벤트 키 UNIQUE, 상태 선점, 시도 횟수, SES message ID를 기록하고 동시 실행과 재시도를 검증한다
 - API Gateway·WAF의 사전 등록 요청 스로틀링(`429`)
 - 네이버 redirect-uri는 `X-Forwarded-*` 위조를 피하려고 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Lambda 함수 URL은 만들지 않거나 IAM 인증을 걸고, Lambda 실행 권한은 API Gateway에만 준다
 - 이벤트 종료 후 30일 내 개인정보 파기
@@ -88,6 +89,8 @@ PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다
 - 실제 PostgreSQL과 SES 연결
 - 메일 실패 재시도와 발송 이력
 - 추천 집계 마감, 감사 가능한 동률 추첨과 결과 스냅샷
+- Lambda 핸들러·서블릿 어댑터·배포 패키징과 API Gateway 통합
+- GitHub Actions에 빌드·테스트·Checkstyle·SpotBugs 필수 체크 구성
 
 ## event-entry-service
 

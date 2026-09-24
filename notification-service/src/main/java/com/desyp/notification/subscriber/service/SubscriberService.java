@@ -68,10 +68,9 @@ public class SubscriberService {
         if (subscriberRepository.existsByPhoneNumber(normalizedPhone)) {
             throw new BusinessException(DUPLICATE_PHONE);
         }
-        // 계정·이메일·휴대전화번호 중복을 먼저 막으므로 본인 이메일은 등록된 추천인으로 찾을 수 없다.
         Subscriber referrer = null;
-        if (StringUtils.hasText(request.referrerEmail())) {
-            referrer = subscriberRepository.findByEmailNormalized(EmailNormalizer.normalize(request.referrerEmail()))
+        if (StringUtils.hasText(request.referralCode())) {
+            referrer = subscriberRepository.findByReferralCode(request.referralCode().trim())
                     .orElseThrow(() -> new BusinessException(REFERRER_NOT_FOUND));
         }
         // 추천인은 신규 등록 시에만 지정한다. 기존 관계를 수정하지 않아 순환 추천을 방지한다.
@@ -82,7 +81,7 @@ public class SubscriberService {
                 .emailNormalized(normalizedEmail)
                 .phoneNumber(normalizedPhone)
                 .referrer(referrer)
-                .inviteToken(UUID.randomUUID().toString())
+                .referralCode(UUID.randomUUID().toString())
                 .ageConfirmed(true)
                 .privacyAgreed(true)
                 .marketingAgreed(true)
@@ -94,7 +93,7 @@ public class SubscriberService {
             // 사전 조회 이후의 동시 등록도 DB UNIQUE 제약으로 차단한다.
             throw new BusinessException(REGISTRATION_CONFLICT);
         }
-        return new SubscriberRegisterResponse(subscriber.getId(), subscriber.getInviteToken());
+        return new SubscriberRegisterResponse(subscriber.getId(), subscriber.getReferralCode());
     }
 
     static String mask(String email) {

@@ -78,14 +78,14 @@ class SubscriberRegistrationTest {
         return new SocialAccount(id, email, phoneNumber);
     }
 
-    private SubscriberRegisterRequest request(String referrerEmail) {
-        return new SubscriberRegisterRequest(true, true, true, referrerEmail);
+    private SubscriberRegisterRequest request(String referralCode) {
+        return new SubscriberRegisterRequest(true, true, true, referralCode);
     }
 
-    private String body(String referrerEmail) {
+    private String body(String referralCode) {
         return """
-                {"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referrerEmail":%s}
-                """.formatted(referrerEmail == null ? "null" : "\"" + referrerEmail + "\"");
+                {"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referralCode":%s}
+                """.formatted(referralCode == null ? "null" : "\"" + referralCode + "\"");
     }
 
     @Test
@@ -94,7 +94,7 @@ class SubscriberRegistrationTest {
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.id").isNumber())
-                .andExpect(jsonPath("$.data.inviteToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.referralCode").isNotEmpty())
                 .andExpect(jsonPath("$.data.email").doesNotExist())
                 .andExpect(jsonPath("$.data.phoneNumber").doesNotExist());
 
@@ -165,8 +165,8 @@ class SubscriberRegistrationTest {
     @Test
     void referralChainAwardsBothSides() throws Exception {
         var a = service.register(account("a", "a@naver.com", "010-0000-0001"), request(null));
-        service.register(account("b", "b@naver.com", "010-0000-0002"), request("a@naver.com"));
-        service.register(account("c", "c@naver.com", "010-0000-0003"), request("b@naver.com"));
+        var b = service.register(account("b", "b@naver.com", "010-0000-0002"), request(a.referralCode()));
+        service.register(account("c", "c@naver.com", "010-0000-0003"), request(b.referralCode()));
 
         assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
         assertThat(referrals.myScore("a").referralBonus()).isZero();
@@ -177,18 +177,18 @@ class SubscriberRegistrationTest {
     }
 
     @Test
-    void referrerMustBeRegisteredEmailAndOwnEmailIsNotFound() throws Exception {
-        service.register(account("first", "first@naver.com", "010-1111-1111"), request(null));
+    void referralRequiresExistingReferralCodeAndDoesNotAcceptEmail() throws Exception {
+        var first = service.register(account("first", "first@naver.com", "010-1111-1111"), request(null));
 
         mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
-                        .contentType(MediaType.APPLICATION_JSON).content(body("missing@naver.com")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body("missing-code")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").isNotEmpty());
         mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
                         .contentType(MediaType.APPLICATION_JSON).content(body("other@naver.com")))
                 .andExpect(status().isNotFound());
         mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
-                        .contentType(MediaType.APPLICATION_JSON).content(body("First@Naver.com")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body(first.referralCode())))
                 .andExpect(status().isCreated());
         assertThat(referrals.myScore("first").referralCount()).isEqualTo(1);
     }
@@ -237,8 +237,8 @@ class SubscriberRegistrationTest {
 
     @Test
     void rankingIncludesTiesAndRequiresNaverAdmin() throws Exception {
-        service.register(account("a", "a@naver.com", "010-0000-0001"), request(null));
-        service.register(account("b", "b@naver.com", "010-0000-0002"), request("a@naver.com"));
+        var a = service.register(account("a", "a@naver.com", "010-0000-0001"), request(null));
+        service.register(account("b", "b@naver.com", "010-0000-0002"), request(a.referralCode()));
         service.register(account("c", "c@naver.com", "010-0000-0003"), request(null));
 
         mvc.perform(get("/api/admin/referrals/ranking?maxRank=1")
@@ -281,13 +281,13 @@ class SubscriberRegistrationTest {
     @Test
     void rejectsUnknownReferralAndDoesNotAwardPointsOnFailedRegistration() {
         assertThatThrownBy(() -> service.register(
-                account("unknown", "unknown@naver.com", "010-2000-0001"), request("missing@naver.com")))
+                account("unknown", "unknown@naver.com", "010-2000-0001"), request("missing-code")))
                 .isInstanceOf(BusinessException.class);
 
-        service.register(account("a", "a@naver.com", "010-2000-0002"), request(null));
+        var a = service.register(account("a", "a@naver.com", "010-2000-0002"), request(null));
         assertThatThrownBy(() -> service.register(
                 account("b", "b@naver.com", "010-2000-0003"),
-                new SubscriberRegisterRequest(true, true, false, "a@naver.com")))
+                new SubscriberRegisterRequest(true, true, false, a.referralCode())))
                 .isInstanceOf(BusinessException.class);
         assertThat(referrals.myScore("a").totalScore()).isZero();
     }
@@ -295,11 +295,11 @@ class SubscriberRegistrationTest {
     @Test
     void duplicateRegistrationCannotChangeReferrerOrAwardBonusTwice() {
         var a = service.register(account("a", "a@naver.com", "010-3000-0001"), request(null));
-        var b = service.register(account("b", "b@naver.com", "010-3000-0002"), request("a@naver.com"));
-        service.register(account("c", "c@naver.com", "010-3000-0003"), request(null));
+        var b = service.register(account("b", "b@naver.com", "010-3000-0002"), request(a.referralCode()));
+        var c = service.register(account("c", "c@naver.com", "010-3000-0003"), request(null));
 
         assertThatThrownBy(() -> service.register(
-                account("b", "b@naver.com", "010-3000-0002"), request("c@naver.com")))
+                account("b", "b@naver.com", "010-3000-0002"), request(c.referralCode())))
                 .isInstanceOf(BusinessException.class);
         assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
         assertThat(referrals.myScore("b").referralBonus()).isEqualTo(1);
@@ -322,7 +322,7 @@ class SubscriberRegistrationTest {
 
     @Test
     void concurrentReferralsDoNotLosePoints() throws Exception {
-        service.register(account("a", "a@naver.com", "010-5000-0000"), request(null));
+        var a = service.register(account("a", "a@naver.com", "010-5000-0000"), request(null));
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(4)) {
             var tasks = new java.util.ArrayList<java.util.concurrent.Future<?>>();
@@ -331,7 +331,7 @@ class SubscriberRegistrationTest {
                 tasks.add(executor.submit(() -> {
                     if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("start timeout");
                     return service.register(account("invitee-" + sequence, "invitee-" + sequence + "@naver.com",
-                            "010-5000-%04d".formatted(sequence)), request("a@naver.com"));
+                            "010-5000-%04d".formatted(sequence)), request(a.referralCode()));
                 }));
             }
             start.countDown();
@@ -367,6 +367,11 @@ class SubscriberRegistrationTest {
         mvc.perform(options("/api/pre-registrations").header("Origin", "https://www.desyp.site")
                         .header("Access-Control-Request-Method", "POST")
                         .header("Access-Control-Request-Headers", "Content-Type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://www.desyp.site"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+        mvc.perform(options("/api/referrals/me").header("Origin", "https://www.desyp.site")
+                        .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", "https://www.desyp.site"))
                 .andExpect(header().string("Access-Control-Allow-Credentials", "true"));

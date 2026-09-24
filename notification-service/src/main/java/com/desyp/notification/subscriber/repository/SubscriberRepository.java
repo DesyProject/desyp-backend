@@ -18,5 +18,7 @@ public interface SubscriberRepository extends JpaRepository<Subscriber, Long> {
 
     Optional<Subscriber> findByEmailNormalized(String emailNormalized);
 
+    Optional<Subscriber> findByReferralCode(String referralCode);
+
     List<Subscriber> findByNotifiedAtIsNullAndMarketingAgreedTrue();
 }

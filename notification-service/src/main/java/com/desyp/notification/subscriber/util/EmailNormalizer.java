@@ -20,12 +20,11 @@ public final class EmailNormalizer {
         String local = lower.substring(0, atIndex);
         String domain = lower.substring(atIndex + 1);
 
-        int plusIndex = local.indexOf('+');
-        if (plusIndex >= 0) {
-            local = local.substring(0, plusIndex);
-        }
-
         if (GMAIL_ALIAS_DOMAINS.contains(domain)) {
+            int plusIndex = local.indexOf('+');
+            if (plusIndex >= 0) {
+                local = local.substring(0, plusIndex);
+            }
             local = local.replace(".", "");
             domain = "gmail.com";
         }

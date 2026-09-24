@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 public interface ReferralRepository extends Repository<Subscriber, Long> {
 
     @Query(value = """
-            SELECT s.id AS subscriberId, s.invite_token AS inviteToken,
+            SELECT s.id AS subscriberId, s.invite_token AS referralCode,
                    COUNT(c.id) AS referralCount, s.referral_bonus AS referralBonus,
                    COUNT(c.id) + s.referral_bonus AS totalScore
             FROM subscribers s LEFT JOIN subscribers c ON c.referrer_id = s.id
@@ -35,7 +35,7 @@ public interface ReferralRepository extends Repository<Subscriber, Long> {
 
     interface Score {
         Long getSubscriberId();
-        String getInviteToken();
+        String getReferralCode();
         long getReferralCount();
         int getReferralBonus();
         long getTotalScore();

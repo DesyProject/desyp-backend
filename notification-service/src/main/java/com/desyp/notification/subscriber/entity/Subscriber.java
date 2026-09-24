@@ -55,7 +55,7 @@ public class Subscriber {
     private int referralBonus;
 
     @Column(name = "invite_token", nullable = false, unique = true)
-    private String inviteToken;
+    private String referralCode;
 
     @Column(name = "age_confirmed", nullable = false)
     private boolean ageConfirmed;
@@ -77,7 +77,7 @@ public class Subscriber {
 
     @Builder
     private Subscriber(AuthProvider provider, String providerAccountId, String email, String emailNormalized, String phoneNumber,
-                        Subscriber referrer, String inviteToken, boolean ageConfirmed, boolean privacyAgreed,
+                        Subscriber referrer, String referralCode, boolean ageConfirmed, boolean privacyAgreed,
                         boolean marketingAgreed, OffsetDateTime consentAt) {
         this.provider = provider;
         this.providerAccountId = providerAccountId;
@@ -86,7 +86,7 @@ public class Subscriber {
         this.phoneNumber = phoneNumber;
         this.referrer = referrer;
         this.referralBonus = referrer == null ? 0 : 1;
-        this.inviteToken = inviteToken;
+        this.referralCode = referralCode;
         this.ageConfirmed = ageConfirmed;
         this.privacyAgreed = privacyAgreed;
         this.marketingAgreed = marketingAgreed;
