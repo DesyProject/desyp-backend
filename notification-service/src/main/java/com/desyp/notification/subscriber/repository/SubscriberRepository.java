@@ -20,5 +20,7 @@ public interface SubscriberRepository extends JpaRepository<Subscriber, Long> {
 
     Optional<Subscriber> findByReferralCode(String referralCode);
 
+    boolean existsByReferralCode(String referralCode);
+
     List<Subscriber> findByNotifiedAtIsNullAndMarketingAgreedTrue();
 }

@@ -179,6 +179,7 @@ class SubscriberRegistrationTest {
     @Test
     void referralRequiresExistingReferralCodeAndDoesNotAcceptEmail() throws Exception {
         var first = service.register(account("first", "first@naver.com", "010-1111-1111"), request(null));
+        assertThat(first.referralCode()).matches("[2-9A-HJKMNP-Z]{8}");
 
         mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
                         .contentType(MediaType.APPLICATION_JSON).content(body("missing-code")))
@@ -188,7 +189,7 @@ class SubscriberRegistrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body("other@naver.com")))
                 .andExpect(status().isNotFound());
         mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
-                        .contentType(MediaType.APPLICATION_JSON).content(body(first.referralCode())))
+                        .contentType(MediaType.APPLICATION_JSON).content(body(" " + first.referralCode().toLowerCase() + " ")))
                 .andExpect(status().isCreated());
         assertThat(referrals.myScore("first").referralCount()).isEqualTo(1);
     }

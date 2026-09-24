@@ -153,10 +153,10 @@ Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
 `POST /api/pre-registrations` (`Content-Type: application/json`만 허용)
 
 ```json
-{"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referralCode":"550e8400-e29b-41d4-a716-446655440000"}
+{"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referralCode":"7K2QM9XA"}
 ```
 
-이메일과 휴대전화번호는 요청 본문이 아니라 네이버 프로필에서만 가져온다. `referralCode`는 선택이며 기존 등록자의 무작위 추천 코드와 일치해야 한다. 등록 성공 응답과 내 추천 점수 응답은 본인의 `referralCode`를 반환한다.
+이메일과 휴대전화번호는 요청 본문이 아니라 네이버 프로필에서만 가져온다. `referralCode`는 선택이며 기존 등록자의 추천 코드와 일치해야 한다. 추천 코드는 혼동 문자(0·O·1·I·L)를 뺀 대문자·숫자 8자리이고, 앞뒤 공백과 소문자 입력은 정규화한다. 등록 성공 응답과 내 추천 점수 응답은 본인의 `referralCode`를 반환한다.
 
 | 코드 | 의미 |
 | --- | --- |

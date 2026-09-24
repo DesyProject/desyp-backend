@@ -2,7 +2,8 @@ package com.desyp.notification.subscriber.service;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
+import java.security.SecureRandom;
+import java.util.Locale;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,6 +26,11 @@ import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.*;
 
 @Service
 public class SubscriberService {
+
+    // 혼동하기 쉬운 0/O, 1/I/L을 뺀 대문자·숫자 31자. 8자리면 약 8,500억 가지다.
+    private static final String REFERRAL_CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+    private static final int REFERRAL_CODE_LENGTH = 8;
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final SubscriberRepository subscriberRepository;
     private final OffsetDateTime registrationEndAt;
@@ -70,7 +76,7 @@ public class SubscriberService {
         }
         Subscriber referrer = null;
         if (StringUtils.hasText(request.referralCode())) {
-            referrer = subscriberRepository.findByReferralCode(request.referralCode().trim())
+            referrer = subscriberRepository.findByReferralCode(request.referralCode().trim().toUpperCase(Locale.ROOT))
                     .orElseThrow(() -> new BusinessException(REFERRER_NOT_FOUND));
         }
         // 추천인은 신규 등록 시에만 지정한다. 기존 관계를 수정하지 않아 순환 추천을 방지한다.
@@ -81,7 +87,7 @@ public class SubscriberService {
                 .emailNormalized(normalizedEmail)
                 .phoneNumber(normalizedPhone)
                 .referrer(referrer)
-                .referralCode(UUID.randomUUID().toString())
+                .referralCode(newReferralCode())
                 .ageConfirmed(true)
                 .privacyAgreed(true)
                 .marketingAgreed(true)
@@ -94,6 +100,23 @@ public class SubscriberService {
             throw new BusinessException(REGISTRATION_CONFLICT);
         }
         return new SubscriberRegisterResponse(subscriber.getId(), subscriber.getReferralCode());
+    }
+
+    private String newReferralCode() {
+        // ponytail: 사전 조회 후 저장 사이의 동시 충돌은 UNIQUE 제약이 REGISTRATION_CONFLICT로 막는다. 확률이 무시할 수준이라 재시도하지 않는다.
+        String code;
+        do {
+            code = randomReferralCode();
+        } while (subscriberRepository.existsByReferralCode(code));
+        return code;
+    }
+
+    static String randomReferralCode() {
+        var code = new StringBuilder(REFERRAL_CODE_LENGTH);
+        for (int i = 0; i < REFERRAL_CODE_LENGTH; i++) {
+            code.append(REFERRAL_CODE_CHARS.charAt(RANDOM.nextInt(REFERRAL_CODE_CHARS.length())));
+        }
+        return code.toString();
     }
 
     static String mask(String email) {
