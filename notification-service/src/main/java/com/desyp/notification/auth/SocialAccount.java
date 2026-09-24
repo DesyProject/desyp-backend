@@ -20,10 +20,10 @@ public record SocialAccount(String accountId, String email, String phoneNumber) 
     }
 
     private static SocialAccount requireNaver(OAuth2AuthenticationToken authentication) {
-        if (!authentication.isAuthenticated()) {
+        var user = authentication.getPrincipal();
+        if (!authentication.isAuthenticated() || user == null) {
             throw new BusinessException(SOCIAL_LOGIN_REQUIRED);
         }
-        var user = authentication.getPrincipal();
         String id = user.getAttribute("id");
         String email = user.getAttribute("email");
         String phoneNumber = user.getAttribute("mobile");
