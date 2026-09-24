@@ -26,7 +26,7 @@ public class RegistrationMailService {
 
     @Transactional
     public int sendEventStartNotifications() {
-        var pending = subscriberRepository.findByNotifiedAtIsNull();
+        var pending = subscriberRepository.findByNotifiedAtIsNullAndMarketingAgreedTrue();
         int sent = 0;
         for (Subscriber subscriber : pending) {
             try {

@@ -1,5 +1,6 @@
 package com.desyp.notification.subscriber;
 
+import java.util.Base64;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -7,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.desyp.common.exception.BusinessException;
 import com.desyp.notification.auth.AuthProvider;
+import com.desyp.notification.auth.LoginRedirect;
 import com.desyp.notification.auth.SocialAccount;
 import com.desyp.notification.referral.service.ReferralService;
 import com.desyp.notification.subscriber.dto.SubscriberRegisterRequest;
@@ -18,6 +20,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockCookie;
+import org.springframework.session.Session;
+import org.springframework.session.SessionRepository;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,8 +35,11 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = "desyp.admin.naver-account-ids=admin-user")
@@ -42,6 +50,7 @@ class SubscriberRegistrationTest {
     @Autowired SubscriberRepository repository;
     @Autowired SubscriberService service;
     @Autowired ReferralService referrals;
+    @Autowired SessionRepository<? extends Session> sessions;
 
     @BeforeEach
     void clean() {
@@ -70,22 +79,22 @@ class SubscriberRegistrationTest {
     }
 
     private SubscriberRegisterRequest request(String referralCode) {
-        return new SubscriberRegisterRequest(true, true, referralCode);
+        return new SubscriberRegisterRequest(true, true, true, referralCode);
     }
 
     private String body(String referralCode) {
         return """
-                {"ageConfirmed":true,"privacyConsented":true,"referralCode":%s}
+                {"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referralCode":%s}
                 """.formatted(referralCode == null ? "null" : "\"" + referralCode + "\"");
     }
 
     @Test
     void registersNaverProfileAndNormalizesPhoneNumber() throws Exception {
-        mvc.perform(post("/api/subscribers").with(naver("naver-1", "User@Naver.com", "010-1234-5678"))
+        mvc.perform(post("/api/pre-registrations").with(naver("naver-1", "User@Naver.com", "010-1234-5678"))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.id").isNumber())
-                .andExpect(jsonPath("$.data.inviteToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.referralCode").isNotEmpty())
                 .andExpect(jsonPath("$.data.email").doesNotExist())
                 .andExpect(jsonPath("$.data.phoneNumber").doesNotExist());
 
@@ -101,7 +110,7 @@ class SubscriberRegistrationTest {
     void rejectsDuplicateNaverAccount() throws Exception {
         service.register(account("naver-1", "first@naver.com", "010-1111-1111"), request(null));
 
-        mvc.perform(post("/api/subscribers").with(naver("naver-1", "second@naver.com", "010-2222-2222"))
+        mvc.perform(post("/api/pre-registrations").with(naver("naver-1", "second@naver.com", "010-2222-2222"))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isConflict());
         assertThat(repository.count()).isEqualTo(1);
@@ -111,7 +120,7 @@ class SubscriberRegistrationTest {
     void rejectsSamePhoneAcrossDifferentNaverAccounts() throws Exception {
         service.register(account("naver-1", "first@naver.com", "010-1234-5678"), request(null));
 
-        mvc.perform(post("/api/subscribers").with(naver("naver-2", "second@naver.com", "+82 10-1234-5678"))
+        mvc.perform(post("/api/pre-registrations").with(naver("naver-2", "second@naver.com", "+82 10-1234-5678"))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("이미 등록된 휴대전화번호입니다"));
@@ -120,10 +129,10 @@ class SubscriberRegistrationTest {
 
     @Test
     void requiresNaverEmailAndPhoneConsent() throws Exception {
-        mvc.perform(post("/api/subscribers").with(naver("naver-1", "user@naver.com", null))
+        mvc.perform(post("/api/pre-registrations").with(naver("naver-1", "user@naver.com", null))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isBadRequest());
-        mvc.perform(post("/api/subscribers").with(naver("naver-2", null, "010-1234-5678"))
+        mvc.perform(post("/api/pre-registrations").with(naver("naver-2", null, "010-1234-5678"))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isBadRequest());
         assertThat(repository.count()).isZero();
@@ -132,7 +141,7 @@ class SubscriberRegistrationTest {
     @Test
     void rejectsGoogleAndUnknownProviders() throws Exception {
         for (RequestPostProcessor login : new RequestPostProcessor[] {oidcLogin(), oauth2Login()}) {
-            mvc.perform(post("/api/subscribers").with(login).with(csrf())
+            mvc.perform(post("/api/pre-registrations").with(login).with(csrf())
                             .contentType(MediaType.APPLICATION_JSON).content(body(null)))
                     .andExpect(status().isUnauthorized());
         }
@@ -142,10 +151,11 @@ class SubscriberRegistrationTest {
     @Test
     void rejectsMissingConsent() throws Exception {
         for (String payload : new String[] {
-                "{\"ageConfirmed\":false,\"privacyConsented\":true}",
-                "{\"ageConfirmed\":true,\"privacyConsented\":false}",
-                "{\"ageConfirmed\":true}"}) {
-            mvc.perform(post("/api/subscribers").with(naver("user", "user@naver.com", "010-1234-5678"))
+                "{\"ageConfirmed\":false,\"agreePrivacy\":true,\"agreeMarketing\":true}",
+                "{\"ageConfirmed\":true,\"agreePrivacy\":false,\"agreeMarketing\":true}",
+                "{\"ageConfirmed\":true,\"agreePrivacy\":true,\"agreeMarketing\":false}",
+                "{\"ageConfirmed\":true,\"agreePrivacy\":true}"}) {
+            mvc.perform(post("/api/pre-registrations").with(naver("user", "user@naver.com", "010-1234-5678"))
                             .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(payload))
                     .andExpect(status().isBadRequest());
         }
@@ -155,8 +165,8 @@ class SubscriberRegistrationTest {
     @Test
     void referralChainAwardsBothSides() throws Exception {
         var a = service.register(account("a", "a@naver.com", "010-0000-0001"), request(null));
-        var b = service.register(account("b", "b@naver.com", "010-0000-0002"), request(a.inviteToken()));
-        service.register(account("c", "c@naver.com", "010-0000-0003"), request(b.inviteToken()));
+        var b = service.register(account("b", "b@naver.com", "010-0000-0002"), request(a.referralCode()));
+        service.register(account("c", "c@naver.com", "010-0000-0003"), request(b.referralCode()));
 
         assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
         assertThat(referrals.myScore("a").referralBonus()).isZero();
@@ -167,26 +177,34 @@ class SubscriberRegistrationTest {
     }
 
     @Test
-    void rejectsSelfReferralByAccountEmailOrPhone() {
+    void referralRequiresExistingReferralCodeAndDoesNotAcceptEmail() throws Exception {
         var first = service.register(account("first", "first@naver.com", "010-1111-1111"), request(null));
+        assertThat(first.referralCode()).matches("[2-9A-HJKMNP-Z]{8}");
 
-        assertThatThrownBy(() -> service.register(
-                account("first", "other@naver.com", "010-2222-2222"), request(first.inviteToken())))
-                .isInstanceOf(BusinessException.class).hasMessage("자기 자신을 추천할 수 없습니다");
-        assertThatThrownBy(() -> service.register(
-                account("other", "first@naver.com", "010-3333-3333"), request(first.inviteToken())))
-                .isInstanceOf(BusinessException.class).hasMessage("자기 자신을 추천할 수 없습니다");
-        assertThatThrownBy(() -> service.register(
-                account("other", "other@naver.com", "010-1111-1111"), request(first.inviteToken())))
-                .isInstanceOf(BusinessException.class).hasMessage("자기 자신을 추천할 수 없습니다");
+        mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body("missing-code")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").isNotEmpty());
+        mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body("other@naver.com")))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/pre-registrations").with(naver("other", "other@naver.com", "010-2222-2222"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body(" " + first.referralCode().toLowerCase() + " ")))
+                .andExpect(status().isCreated());
+        assertThat(referrals.myScore("first").referralCount()).isEqualTo(1);
     }
 
     @Test
-    void requiresAuthenticationAndCsrf() throws Exception {
-        mvc.perform(post("/api/subscribers").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
+    void requiresAuthenticationAndJsonButCsrfOnlyForAdmin() throws Exception {
+        mvc.perform(post("/api/pre-registrations").contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/subscribers").with(naver("user", "user@naver.com", "010-1234-5678"))
+        mvc.perform(post("/api/pre-registrations").with(naver("user", "user@naver.com", "010-1234-5678"))
+                        .contentType(MediaType.TEXT_PLAIN).content(body(null)))
+                .andExpect(status().isUnsupportedMediaType());
+        mvc.perform(post("/api/pre-registrations").with(naver("user", "user@naver.com", "010-1234-5678"))
                         .contentType(MediaType.APPLICATION_JSON).content(body(null)))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/admin/mail/event-start").with(naver("admin-user", "admin@naver.com", "010-9999-9999")))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/csrf")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.token").isNotEmpty());
@@ -221,7 +239,7 @@ class SubscriberRegistrationTest {
     @Test
     void rankingIncludesTiesAndRequiresNaverAdmin() throws Exception {
         var a = service.register(account("a", "a@naver.com", "010-0000-0001"), request(null));
-        service.register(account("b", "b@naver.com", "010-0000-0002"), request(a.inviteToken()));
+        service.register(account("b", "b@naver.com", "010-0000-0002"), request(a.referralCode()));
         service.register(account("c", "c@naver.com", "010-0000-0003"), request(null));
 
         mvc.perform(get("/api/admin/referrals/ranking?maxRank=1")
@@ -229,7 +247,8 @@ class SubscriberRegistrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].rank").value(1))
-                .andExpect(jsonPath("$.data[0].phoneNumber").isNotEmpty());
+                .andExpect(jsonPath("$.data[0].email").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].phoneNumber").doesNotExist());
         mvc.perform(get("/api/admin/referrals/ranking")
                         .with(naver("normal-user", "normal@naver.com", "010-8888-8888")))
                 .andExpect(status().isForbidden());
@@ -253,7 +272,7 @@ class SubscriberRegistrationTest {
     void rejectsDuplicateNormalizedEmail() throws Exception {
         service.register(account("first", "foo.bar+tag@gmail.com", "010-1000-0001"), request(null));
 
-        mvc.perform(post("/api/subscribers")
+        mvc.perform(post("/api/pre-registrations")
                         .with(naver("second", "foobar@googlemail.com", "010-1000-0002"))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isConflict());
@@ -263,13 +282,13 @@ class SubscriberRegistrationTest {
     @Test
     void rejectsUnknownReferralAndDoesNotAwardPointsOnFailedRegistration() {
         assertThatThrownBy(() -> service.register(
-                account("unknown", "unknown@naver.com", "010-2000-0001"), request("missing")))
+                account("unknown", "unknown@naver.com", "010-2000-0001"), request("missing-code")))
                 .isInstanceOf(BusinessException.class);
 
-        var referrer = service.register(account("a", "a@naver.com", "010-2000-0002"), request(null));
+        var a = service.register(account("a", "a@naver.com", "010-2000-0002"), request(null));
         assertThatThrownBy(() -> service.register(
                 account("b", "b@naver.com", "010-2000-0003"),
-                new SubscriberRegisterRequest(true, false, referrer.inviteToken())))
+                new SubscriberRegisterRequest(true, true, false, a.referralCode())))
                 .isInstanceOf(BusinessException.class);
         assertThat(referrals.myScore("a").totalScore()).isZero();
     }
@@ -277,11 +296,11 @@ class SubscriberRegistrationTest {
     @Test
     void duplicateRegistrationCannotChangeReferrerOrAwardBonusTwice() {
         var a = service.register(account("a", "a@naver.com", "010-3000-0001"), request(null));
-        var b = service.register(account("b", "b@naver.com", "010-3000-0002"), request(a.inviteToken()));
+        var b = service.register(account("b", "b@naver.com", "010-3000-0002"), request(a.referralCode()));
         var c = service.register(account("c", "c@naver.com", "010-3000-0003"), request(null));
 
         assertThatThrownBy(() -> service.register(
-                account("b", "b@naver.com", "010-3000-0002"), request(c.inviteToken())))
+                account("b", "b@naver.com", "010-3000-0002"), request(c.referralCode())))
                 .isInstanceOf(BusinessException.class);
         assertThat(referrals.myScore("a").referralCount()).isEqualTo(1);
         assertThat(referrals.myScore("b").referralBonus()).isEqualTo(1);
@@ -313,7 +332,7 @@ class SubscriberRegistrationTest {
                 tasks.add(executor.submit(() -> {
                     if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("start timeout");
                     return service.register(account("invitee-" + sequence, "invitee-" + sequence + "@naver.com",
-                            "010-5000-%04d".formatted(sequence)), request(a.inviteToken()));
+                            "010-5000-%04d".formatted(sequence)), request(a.referralCode()));
                 }));
             }
             start.countDown();
@@ -326,8 +345,64 @@ class SubscriberRegistrationTest {
     @Test
     void apiDocsAreAccessibleWithoutLoginAndMalformedJsonFails() throws Exception {
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
-        mvc.perform(post("/api/subscribers").with(naver("user", "user@naver.com", "010-6000-0001"))
+        mvc.perform(post("/api/pre-registrations").with(naver("user", "user@naver.com", "010-6000-0001"))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void meReturnsMaskedEmailAndRegistrationWithoutPhone() throws Exception {
+        mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/me").with(naver("me", "desyp@naver.com", "010-7000-0001")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.emailMasked").value("des***@naver.com"))
+                .andExpect(jsonPath("$.registered").value(false))
+                .andExpect(jsonPath("$.phoneNumber").doesNotExist());
+        service.register(account("me", "desyp@naver.com", "010-7000-0001"), request(null));
+        mvc.perform(get("/api/me").with(naver("me", "desyp@naver.com", "010-7000-0001")))
+                .andExpect(jsonPath("$.registered").value(true));
+    }
+
+    @Test
+    void corsAllowsOnlyFrontendOriginWithCredentials() throws Exception {
+        mvc.perform(options("/api/pre-registrations").header("Origin", "https://www.desyp.site")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Content-Type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://www.desyp.site"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+        mvc.perform(options("/api/referrals/me").header("Origin", "https://www.desyp.site")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://www.desyp.site"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+        mvc.perform(options("/api/pre-registrations").header("Origin", "https://evil.example")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void naverLoginStoresOnlyFrontendReturnToInJdbcSession() throws Exception {
+        assertThat(storedReturnTo("https://www.desyp.site/#entry-card")).isEqualTo("https://www.desyp.site/#entry-card");
+        for (String unsafe : new String[] {"https://www.desyp.site.evil.com/", "https://evil.com/?x=https://www.desyp.site",
+                "//evil.com", "https://user@www.desyp.site/", "javascript:alert(1)"}) {
+            assertThat(storedReturnTo(unsafe)).isEqualTo("https://www.desyp.site/");
+        }
+    }
+
+    private Object storedReturnTo(String returnTo) throws Exception {
+        var response = mvc.perform(get("/auth/naver/login").param("return_to", returnTo))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/oauth2/authorization/naver"))
+                .andReturn().getResponse();
+        var cookie = (MockCookie) response.getCookie("SESSION");
+        assertThat(cookie).isNotNull();
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.getSameSite()).isEqualTo("Lax");
+        assertThat(cookie.getSecure()).isTrue();
+        String sessionId = new String(Base64.getDecoder().decode(cookie.getValue()));
+        Session session = sessions.findById(sessionId);
+        assertThat(session).isNotNull();
+        return session.getAttribute(LoginRedirect.class.getName() + ".RETURN_TO");
     }
 }

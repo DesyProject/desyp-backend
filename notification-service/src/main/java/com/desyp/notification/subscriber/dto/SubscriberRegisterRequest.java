@@ -6,7 +6,8 @@ import jakarta.validation.constraints.Size;
 
 public record SubscriberRegisterRequest(
         @NotNull @AssertTrue Boolean ageConfirmed,
-        @NotNull @AssertTrue Boolean privacyConsented,
+        @NotNull @AssertTrue Boolean agreePrivacy,
+        @NotNull @AssertTrue Boolean agreeMarketing,
         @Size(max = 64) String referralCode
 ) {
 }

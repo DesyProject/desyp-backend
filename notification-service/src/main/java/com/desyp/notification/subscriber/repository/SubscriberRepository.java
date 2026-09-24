@@ -16,7 +16,11 @@ public interface SubscriberRepository extends JpaRepository<Subscriber, Long> {
 
     boolean existsByPhoneNumber(String phoneNumber);
 
-    Optional<Subscriber> findByInviteToken(String inviteToken);
+    Optional<Subscriber> findByEmailNormalized(String emailNormalized);
 
-    List<Subscriber> findByNotifiedAtIsNull();
+    Optional<Subscriber> findByReferralCode(String referralCode);
+
+    boolean existsByReferralCode(String referralCode);
+
+    List<Subscriber> findByNotifiedAtIsNullAndMarketingAgreedTrue();
 }
