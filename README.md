@@ -132,30 +132,47 @@ Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다. 
 
 ### 서버 초기 설정 (한 번만)
 
-Amazon Linux 2023 기준이다.
+Amazon Linux 2023, t3.micro(메모리 1GB) 한 대에 PostgreSQL을 함께 설치하는 기준이다.
 
-1. 보안 그룹은 80·443을 공개하고 22는 배포에 필요한 범위로 제한한다. 8080은 열지 않는다.
-2. SES 발송 권한(`ses:SendEmail`)이 있는 IAM 역할을 인스턴스에 연결한다. 액세스 키는 서버에 두지 않는다.
-3. 패키지와 사용자를 준비한다.
+1. 탄력적 IP를 인스턴스에 연결한다. 자동 할당 공인 IP는 중지 후 시작하면 바뀐다.
+2. 보안 그룹은 80·443을 공개하고 22는 배포에 필요한 범위로 제한한다. 8080과 5432는 열지 않는다.
+3. SES 발송 권한(`ses:SendEmail`)이 있는 IAM 역할을 인스턴스에 연결한다. 액세스 키는 서버에 두지 않는다.
+4. 메모리가 1GB라 스왑 2GB를 추가한다.
    ```sh
-   sudo dnf install -y java-21-amazon-corretto-headless nginx certbot
+   sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 && sudo chmod 600 /swapfile
+   sudo mkswap /swapfile && sudo swapon /swapfile
+   echo '/swapfile none swap defaults 0 0' | sudo tee -a /etc/fstab
+   ```
+5. 패키지와 사용자를 준비한다.
+   ```sh
+   sudo dnf install -y java-21-amazon-corretto-headless nginx certbot postgresql18-server
    sudo useradd --system --home /opt/desyp --shell /sbin/nologin desyp
    sudo install -d -o desyp -g desyp /opt/desyp
    ```
-4. `deploy/notification.env.example`을 참고해 `/etc/desyp/notification.env`를 만들고 `chmod 600`한다.
-5. `api.desyp.site` DNS를 EC2 공인 IP(탄력적 IP)로 연결한 뒤 인증서를 받는다. 갱신 때도 같은 훅이 쓰인다.
+6. PostgreSQL을 비밀번호 인증으로 초기화하고 DB를 만든다. 기본 초기화는 localhost 접속을 비밀번호 없이 허용하므로 옵션을 지정한다. PostgreSQL은 기본값대로 localhost에서만 접속을 받는다.
+   ```sh
+   sudo PGSETUP_INITDB_OPTIONS="--auth-host=scram-sha-256 --auth-local=peer" postgresql-setup --initdb
+   sudo grep -vE '^\s*(#|$)' /var/lib/pgsql/data/pg_hba.conf   # host 줄이 scram-sha-256인지 확인
+   sudo systemctl enable --now postgresql
+   sudo -u postgres psql -c "CREATE ROLE desyp LOGIN PASSWORD '<DB 비밀번호>'"
+   sudo -u postgres psql -c "CREATE DATABASE desyp OWNER desyp"
+   ```
+   테이블은 앱 기동 시 Flyway가 만든다.
+7. `deploy/notification.env.example`을 참고해 `/etc/desyp/notification.env`를 만들고 `chmod 600`한다. `DB_PASSWORD`는 6번에서 정한 값이다.
+8. `api.desyp.site` DNS를 탄력적 IP로 연결한 뒤 인증서를 받는다. 갱신 때도 같은 훅이 쓰인다.
    ```sh
    sudo certbot certonly --standalone -d api.desyp.site \
      --pre-hook "systemctl stop nginx" --post-hook "systemctl start nginx"
    ```
-6. 설정 파일을 복사하고 서비스를 켠다.
+9. 로컬에서 `scp -r deploy <EC2_USER>@<탄력적 IP>:~/`로 설정 파일을 올린 뒤 복사하고 서비스를 켠다. jar는 첫 자동 배포가 올린다.
    ```sh
    sudo cp deploy/nginx.conf /etc/nginx/conf.d/desyp-api.conf
    sudo cp deploy/desyp-notification.service /etc/systemd/system/
    sudo systemctl daemon-reload
-   sudo systemctl enable --now nginx desyp-notification
+   sudo systemctl enable nginx desyp-notification && sudo systemctl start nginx
    ```
-7. 배포 사용자가 비밀번호 없이 `sudo install`, `sudo cp`, `sudo systemctl restart desyp-notification`, `sudo journalctl`을 실행할 수 있게 한다.
+10. 배포 사용자가 비밀번호 없이 `sudo install`, `sudo cp`, `sudo systemctl restart desyp-notification`, `sudo journalctl`을 실행할 수 있게 한다.
+11. 백업은 Amazon Data Lifecycle Manager로 EBS 볼륨 일일 스냅샷을 만든다. 스냅샷에도 개인정보가 있으므로 보관은 7일로 두고, 이벤트 종료 후 30일 내 파기 대상에 포함한다.
 
 ### 자동 배포
 

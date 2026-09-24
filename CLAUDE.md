@@ -10,7 +10,7 @@
 | 모듈 | 책임 | 배포 목표 |
 | --- | --- | --- |
 | `common` | 공통 응답과 예외 | 라이브러리 |
-| `notification-service` | 사전 등록, 추천 점수·순위, 메일 | AWS EC2 (Nginx + systemd) |
+| `notification-service` | 사전 등록, 추천 점수·순위, 메일 | AWS EC2 한 대 (Nginx + systemd + PostgreSQL) |
 | `event-entry-service` | 이벤트 당일 응모 | k3s |
 
 Java 21, Spring Boot 4.1.1, Gradle Groovy를 사용한다. Spring Boot 4.x 기준으로 `jakarta.*` 패키지를 사용한다.
@@ -81,7 +81,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - EventBridge 연동 전에 메일 발송 상태를 별도 테이블로 관리한다. 수신자·이벤트 키 UNIQUE, 상태 선점, 시도 횟수, SES message ID를 기록하고 동시 실행과 재시도를 검증한다
 - Nginx 요청 제한(`429`) 운영 적용과 수치 조정. 사전 등록은 IP당 초당 1건(버스트 5), 그 외는 초당 10건(버스트 20)
 - 네이버 redirect-uri는 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Spring Boot는 `127.0.0.1`에만 바인딩하고 Nginx가 `X-Forwarded-*`를 덮어써 위조를 막는다. 보안 그룹은 80·443만 공개하고 8080은 열지 않는다
-- 이벤트 종료 후 30일 내 개인정보 파기
+- 이벤트 종료 후 30일 내 개인정보 파기. DB와 EBS 스냅샷 백업을 모두 포함한다
 - EventBridge Scheduler의 정확한 이벤트 시작 시각과 1시간 전 실행
 - 네이버 개발자센터의 이메일·휴대전화번호 제공 권한과 실제 OAuth 응답
 - 기존 Google 가입 데이터의 운영 전 정리 여부. V5는 데이터 손실을 피하기 위해 기존 행의 `phone_number`를 NULL로 유지한다.

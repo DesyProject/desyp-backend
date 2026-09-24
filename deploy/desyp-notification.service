@@ -1,8 +1,9 @@
 # /etc/systemd/system/desyp-notification.service
 [Unit]
 Description=desyp notification-service
-After=network-online.target
+After=network-online.target postgresql.service
 Wants=network-online.target
+Requires=postgresql.service
 
 [Service]
 User=desyp
@@ -12,7 +13,8 @@ EnvironmentFile=/etc/desyp/notification.env
 Environment=SPRING_PROFILES_ACTIVE=oauth SERVER_ADDRESS=127.0.0.1 SERVER_FORWARD_HEADERS_STRATEGY=native
 # 운영에서는 API 문서를 공개하지 않는다.
 Environment=SPRINGDOC_API_DOCS_ENABLED=false SPRINGDOC_SWAGGER_UI_ENABLED=false
-ExecStart=/usr/bin/java -XX:MaxRAMPercentage=70 -jar /opt/desyp/notification-service.jar
+# t3.micro(1GB)에서 PostgreSQL과 메모리를 나눠 쓰므로 힙을 40%로 제한한다.
+ExecStart=/usr/bin/java -XX:MaxRAMPercentage=40 -jar /opt/desyp/notification-service.jar
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=5
