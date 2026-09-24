@@ -1,0 +1,18 @@
+# 로컬 개발 전용. SPRING_PROFILES_ACTIVE=oauth,local 로 실행한다.
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          naver:
+            redirect-uri: http://localhost:8080/auth/naver/callback
+server:
+  servlet:
+    session:
+      cookie:
+        # 로컬 HTTP에서는 Secure 쿠키를 쓰지 않는다.
+        secure: false
+desyp:
+  frontend:
+    # CORS 허용 Origin(credentials 허용)과 return_to 허용 범위
+    origin: http://localhost:5173
