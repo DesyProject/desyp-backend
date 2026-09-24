@@ -14,8 +14,8 @@ class EmailNormalizerTest {
     }
 
     @Test
-    void gmail이_아닌_도메인은_점과_플러스만_처리한다() {
+    void gmail이_아닌_도메인은_플러스가_주소의_일부이므로_보존한다() {
         assertThat(EmailNormalizer.normalize("a.b+tag@example.com"))
-                .isEqualTo("a.b@example.com");
+                .isEqualTo("a.b+tag@example.com");
     }
 }

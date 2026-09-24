@@ -5,14 +5,14 @@
 ## 제품 정책
 
 1. 사용자는 네이버 소셜 로그인 후 이메일과 휴대전화번호 제공에 동의하고, 만 14세 이상 확인·개인정보 수집·오픈 알림 수신에 모두 동의해야 사전 등록할 수 있다.
-2. B가 사전 등록 시 A의 사전 등록 이메일을 추천인으로 입력하면 A는 추천 성공 1점, B는 추천인 입력 보너스 1점을 받는다.
-3. **추천 점수 = 실제 추천 인원 수 + 추천인 입력 보너스(최대 1점)** 이다.
+2. B가 사전 등록 시 A의 추천 코드를 입력하면 A는 추천 성공 1점, B는 추천 코드 사용 보너스 1점을 받는다.
+3. **추천 점수 = 실제 추천 인원 수 + 추천 코드 사용 보너스(최대 1점)** 이다.
 4. 최고점자가 여러 명이면 최고점 동률자 중 최종 1등 한 명을 무작위로 추첨한다.
 5. 공개 결과에는 개인정보를 마스킹한 1등 한 명만 표시하고, 관리자는 당첨자 연락용 이메일을 조회한다.
 6. 운영자가 당첨자에게 직접 연락해 5만 원 이하 상품을 확인하고 발송한다. 상품 선택 API는 만들지 않는다.
 7. 메인 이벤트 시작 1시간 전에 사전 등록자에게 이메일을 발송한다.
 
-사전 등록 인원으로 메인 이벤트 참여 규모를 예측하기 위해 로그인 제공자를 네이버로 제한한다. 네이버 계정이 달라도 정규화된 휴대전화번호가 같으면 한 사람으로 보고 중복 등록을 차단한다. 동일 네이버 계정·정규화 이메일 중복, 자기추천, 등록 후 추천인 변경도 차단한다.
+사전 등록 인원으로 메인 이벤트 참여 규모를 예측하기 위해 로그인 제공자를 네이버로 제한한다. 네이버 계정이 달라도 정규화된 휴대전화번호가 같으면 한 사람으로 보고 중복 등록을 차단한다. 동일 네이버 계정·정규화 이메일 중복, 자기추천, 등록 후 추천인 변경도 차단한다. 추천에는 이메일 같은 개인정보 대신 무작위 추천 코드를 사용한다.
 
 휴대전화번호는 중복 참여 확인에만 쓰고 연락에는 사용하지 않는다. 사용자에게도 그렇게 고지하므로 관리자 API를 포함한 어떤 응답에도 내려보내지 않는다. 당첨·이벤트 안내는 이메일로만 한다.
 
@@ -112,8 +112,8 @@ Java 21과 PostgreSQL을 준비하고 다음 환경 변수를 설정한다.
 - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
 - `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`
 - `NAVER_REDIRECT_URI`: 운영 `https://api.desyp.site/auth/naver/callback`, 로컬 `http://localhost:8080/auth/naver/callback`. 네이버 개발자센터 Callback URL과 같아야 한다
-- `SES_SENDER_EMAIL`
-- `SPRING_PROFILES_ACTIVE=oauth`
+- `SES_SENDER_EMAIL`, `AWS_REGION`: SES 클라이언트 생성에 리전이 필요하다. 로컬도 `ap-northeast-2` 등 값을 넣어야 서버가 뜬다
+- `SPRING_PROFILES_ACTIVE=oauth`. 로컬은 `oauth,local`이며 `local` 프로필이 CORS·`return_to` Origin `http://localhost:5173`, 로컬 redirect-uri, 비Secure 세션 쿠키를 설정한다
 - `FRONTEND_ORIGIN`: 기본 `https://www.desyp.site`. 로컬 프런트는 `http://localhost:5173`
 - `REGISTRATION_END_AT`: 기본 `2026-10-14T23:59:59+09:00`
 
@@ -153,17 +153,17 @@ Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
 `POST /api/pre-registrations` (`Content-Type: application/json`만 허용)
 
 ```json
-{"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referrerEmail":"friend@naver.com"}
+{"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referralCode":"7K2QM9XA"}
 ```
 
-이메일과 휴대전화번호는 요청 본문이 아니라 네이버 프로필에서만 가져온다. `referrerEmail`은 선택이며 정규화한 이메일로 기존 등록자를 찾는다.
+이메일과 휴대전화번호는 요청 본문이 아니라 네이버 프로필에서만 가져온다. `referralCode`는 선택이며 기존 등록자의 추천 코드와 일치해야 한다. 추천 코드는 혼동 문자(0·O·1·I·L)를 뺀 대문자·숫자 8자리이고, 앞뒤 공백과 소문자 입력은 정규화한다. 등록 성공 응답과 내 추천 점수 응답은 본인의 `referralCode`를 반환한다.
 
 | 코드 | 의미 |
 | --- | --- |
 | `201` | 등록 완료 |
 | `400` | 동의 누락, 요청 형식 오류 |
 | `401` | 로그인 필요 또는 세션 만료 |
-| `404` | 추천인 이메일로 등록한 사람 없음. 본인 이메일도 포함 |
+| `404` | 유효하지 않은 추천 코드 |
 | `409` | 이미 등록한 네이버 계정·이메일·휴대전화번호 |
 | `410` | 마감 이후 요청 |
 | `415` | JSON이 아닌 요청 |

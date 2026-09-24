@@ -21,7 +21,7 @@ public class ReferralService {
     public ReferralScoreResponse myScore(String providerAccountId) {
         var score = referralRepository.findScore(AuthProvider.NAVER.name(), providerAccountId)
                 .orElseThrow(() -> new BusinessException(SUBSCRIBER_NOT_FOUND));
-        return new ReferralScoreResponse(score.getSubscriberId(), score.getInviteToken(),
+        return new ReferralScoreResponse(score.getSubscriberId(), score.getReferralCode(),
                 score.getReferralCount(), score.getReferralBonus(), score.getTotalScore());
     }
 
