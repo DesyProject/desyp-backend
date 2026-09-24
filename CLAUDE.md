@@ -40,7 +40,7 @@ Java 21, Spring Boot 4.1.1, Gradle Groovy를 사용한다. Spring Boot 4.x 기�
 - 기능 브랜치: `feat/`, `fix/`, `refactor/`, `chore/`
 - 긴급 수정: `hotfix/`
 
-PR은 최소 한 명이 리뷰하고 Checkstyle·SpotBugs를 함께 사용한다.
+PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 통과해야 main·develop에 병합할 수 있다.
 
 ## notification-service
 
