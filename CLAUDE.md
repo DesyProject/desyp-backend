@@ -10,7 +10,7 @@
 | 모듈 | 책임 | 배포 목표 |
 | --- | --- | --- |
 | `common` | 공통 응답과 예외 | 라이브러리 |
-| `notification-service` | 사전 등록, 추천 점수·순위, 메일 | AWS Lambda |
+| `notification-service` | 사전 등록, 추천 점수·순위, 메일 | AWS EC2 (Nginx + systemd) |
 | `event-entry-service` | 이벤트 당일 응모 | k3s |
 
 Java 21, Spring Boot 4.1.1, Gradle Groovy를 사용한다. Spring Boot 4.x 기준으로 `jakarta.*` 패키지를 사용한다.
@@ -52,7 +52,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - `mail`: 관리자 트리거 기반 SES 발송과 `notified_at` 중복 방지
 - `global`: 세션, CSRF, CORS, 보안 설정
 
-사전 등록·마감·점수·순위·관리자 메일 트리거는 구현됐다. 최고점 동률 추첨, 결과 스냅샷, 공개 결과, EventBridge Scheduler, 429 스로틀링, 30일 파기는 미구현이다.
+사전 등록·마감·점수·순위·관리자 메일 트리거는 구현됐다. 최고점 동률 추첨, 결과 스냅샷, 공개 결과, EventBridge Scheduler, 30일 파기는 미구현이다. 429 요청 제한은 `deploy/nginx.conf`에 작성했으며 운영 적용 전이다.
 
 ### 데이터 규칙
 
@@ -72,16 +72,15 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 
 내 점수는 로그인 계정으로만 조회한다. 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
 
-세션은 Spring Session JDBC로 PostgreSQL `SPRING_SESSION` 테이블(V7)에 저장해 Lambda 인스턴스 간에 공유한다. 세션 쿠키 속성(`HttpOnly`, `SameSite=Lax`, `Secure`)은 Boot 속성이 내장 서버에서만 적용되므로 `SecurityConfig`의 `CookieSerializer`에서 지정한다.
+세션은 Spring Session JDBC로 PostgreSQL `SPRING_SESSION` 테이블(V7)에 저장해 서버 재시작이나 인스턴스 추가 후에도 유지한다. 만료 세션은 앱의 `cleanup-cron`(1분 주기)이 정리한다. 세션 쿠키 속성(`HttpOnly`, `SameSite=Lax`, `Secure`)은 Boot 속성이 내장 서버에서만 적용되므로 `SecurityConfig`의 `CookieSerializer`에서 지정한다.
 
 `return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`는 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·휴대전화번호·네이버 식별자는 로그에 남기지 않는다.
 
 ### 배포 전 확인
 
-- Spring Session JDBC의 만료 세션 정리(`cleanup-cron`, 1분 주기)는 Lambda가 요청 사이에 멈추면 실행되지 않는다. 만료 세션은 조회 시 거부되지만 행이 쌓이므로 별도 정리 작업을 정한다
 - EventBridge 연동 전에 메일 발송 상태를 별도 테이블로 관리한다. 수신자·이벤트 키 UNIQUE, 상태 선점, 시도 횟수, SES message ID를 기록하고 동시 실행과 재시도를 검증한다
-- API Gateway·WAF의 사전 등록 요청 스로틀링(`429`)
-- 네이버 redirect-uri는 `X-Forwarded-*` 위조를 피하려고 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Lambda 함수 URL은 만들지 않거나 IAM 인증을 걸고, Lambda 실행 권한은 API Gateway에만 준다
+- Nginx 요청 제한(`429`) 운영 적용과 수치 조정. 사전 등록은 IP당 초당 1건(버스트 5), 그 외는 초당 10건(버스트 20)
+- 네이버 redirect-uri는 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Spring Boot는 `127.0.0.1`에만 바인딩하고 Nginx가 `X-Forwarded-*`를 덮어써 위조를 막는다. 보안 그룹은 80·443만 공개하고 8080은 열지 않는다
 - 이벤트 종료 후 30일 내 개인정보 파기
 - EventBridge Scheduler의 정확한 이벤트 시작 시각과 1시간 전 실행
 - 네이버 개발자센터의 이메일·휴대전화번호 제공 권한과 실제 OAuth 응답
@@ -89,8 +88,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - 실제 PostgreSQL과 SES 연결
 - 메일 실패 재시도와 발송 이력
 - 추천 집계 마감, 감사 가능한 동률 추첨과 결과 스냅샷
-- Lambda 핸들러·서블릿 어댑터·배포 패키징과 API Gateway 통합
-- GitHub Actions에 빌드·테스트·Checkstyle·SpotBugs 필수 체크 구성
+- EC2 초기 설정(Java 21, Nginx, 인증서, systemd, IAM 역할)과 배포 secrets 등록. 절차는 README의 EC2 배포
 
 ## event-entry-service
 
@@ -124,7 +122,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - 서버 렌더링이 필요해지면 S3 정적 배포 결정을 다시 검토한다.
 - API 진입점의 WAF와 rate limit은 정적 CDN 설정과 분리한다.
 
-관측성은 OpenTelemetry와 Prometheus·Loki·Tempo·Grafana를 사용한다. Lambda 메트릭은 OTel Collector로 전송하며 Collector 위치는 배포 전에 정한다.
+관측성은 OpenTelemetry와 Prometheus·Loki·Tempo·Grafana를 사용한다. EC2 애플리케이션 메트릭은 OTel Collector로 전송하며 Collector 위치는 배포 전에 정한다.
 
 ## Graphify
 

@@ -1,0 +1,21 @@
+# /etc/systemd/system/desyp-notification.service
+[Unit]
+Description=desyp notification-service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=desyp
+WorkingDirectory=/opt/desyp
+# Secret 값은 저장소가 아닌 서버 파일에만 둔다. 항목은 deploy/notification.env.example 참고.
+EnvironmentFile=/etc/desyp/notification.env
+Environment=SPRING_PROFILES_ACTIVE=oauth SERVER_ADDRESS=127.0.0.1 SERVER_FORWARD_HEADERS_STRATEGY=native
+# 운영에서는 API 문서를 공개하지 않는다.
+Environment=SPRINGDOC_API_DOCS_ENABLED=false SPRINGDOC_SWAGGER_UI_ENABLED=false
+ExecStart=/usr/bin/java -XX:MaxRAMPercentage=70 -jar /opt/desyp/notification-service.jar
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

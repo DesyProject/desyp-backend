@@ -94,7 +94,8 @@ entryButton.addEventListener('click', () =>
 | 메인 이벤트 페이지 | 비공개 S3 + CloudFront OAC 사용 확정 |
 | 사전 등록 마감(410) | 구현 완료 |
 | 세션 공유 | Spring Session JDBC(PostgreSQL) 구현 완료 |
-| 과도한 요청 차단(429) | 미구현. API Gateway·WAF 스로틀링으로 처리 예정 |
+| 과도한 요청 차단(429) | Nginx 설정 작성(`deploy/nginx.conf`), 운영 적용 전 |
+| EC2 배포 | 설정 작성(`deploy/`, `.github/workflows/deploy.yml`), 서버 미구축 |
 | 이벤트 종료 후 30일 내 파기 | 미구현 |
 
 ## 프로젝트 구성
@@ -123,7 +124,51 @@ Java 21과 PostgreSQL을 준비하고 다음 환경 변수를 설정한다.
 ./gradlew :notification-service:bootRun
 ```
 
-Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다.
+Swagger UI는 `http://localhost:8080/swagger-ui/index.html`에서 확인한다. 운영 서버는 systemd 설정에서 API 문서를 끈다.
+
+## EC2 배포
+
+`notification-service`는 EC2 한 대에서 `Nginx(HTTPS·429) → Spring Boot(127.0.0.1:8080)`로 운영한다. 설정 파일은 `deploy/`에 있다.
+
+### 서버 초기 설정 (한 번만)
+
+Amazon Linux 2023 기준이다.
+
+1. 보안 그룹은 80·443을 공개하고 22는 배포에 필요한 범위로 제한한다. 8080은 열지 않는다.
+2. SES 발송 권한(`ses:SendEmail`)이 있는 IAM 역할을 인스턴스에 연결한다. 액세스 키는 서버에 두지 않는다.
+3. 패키지와 사용자를 준비한다.
+   ```sh
+   sudo dnf install -y java-21-amazon-corretto-headless nginx certbot
+   sudo useradd --system --home /opt/desyp --shell /sbin/nologin desyp
+   sudo install -d -o desyp -g desyp /opt/desyp
+   ```
+4. `deploy/notification.env.example`을 참고해 `/etc/desyp/notification.env`를 만들고 `chmod 600`한다.
+5. `api.desyp.site` DNS를 EC2 공인 IP(탄력적 IP)로 연결한 뒤 인증서를 받는다. 갱신 때도 같은 훅이 쓰인다.
+   ```sh
+   sudo certbot certonly --standalone -d api.desyp.site \
+     --pre-hook "systemctl stop nginx" --post-hook "systemctl start nginx"
+   ```
+6. 설정 파일을 복사하고 서비스를 켠다.
+   ```sh
+   sudo cp deploy/nginx.conf /etc/nginx/conf.d/desyp-api.conf
+   sudo cp deploy/desyp-notification.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now nginx desyp-notification
+   ```
+7. 배포 사용자가 비밀번호 없이 `sudo install`, `sudo cp`, `sudo systemctl restart desyp-notification`, `sudo journalctl`을 실행할 수 있게 한다.
+
+### 자동 배포
+
+`main`에 push되면 `.github/workflows/deploy.yml`이 빌드·테스트 후 jar를 올리고 서비스를 재시작한다. 비로그인 `/api/me`가 `401`을 반환하면 기동 완료로 본다. 저장소 Secrets에 다음 값을 등록한다.
+
+| Secret | 값 |
+| --- | --- |
+| `EC2_HOST` | EC2 공인 IP 또는 도메인 |
+| `EC2_USER` | SSH 사용자(예: `ec2-user`) |
+| `EC2_SSH_KEY` | 배포 전용 SSH 개인 키 |
+| `EC2_KNOWN_HOSTS` | `ssh-keyscan <EC2_HOST>` 결과. 호스트 키를 고정한다 |
+
+직전 jar는 `/opt/desyp/notification-service.jar.prev`에 남는다. 롤백은 이 파일을 `notification-service.jar`로 복사한 뒤 서비스를 재시작한다.
 
 ## API 흐름
 
