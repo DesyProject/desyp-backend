@@ -94,8 +94,8 @@ entryButton.addEventListener('click', () =>
 | 메인 이벤트 페이지 | 비공개 S3 + CloudFront OAC 사용 확정 |
 | 사전 등록 마감(410) | 구현 완료 |
 | 세션 공유 | Spring Session JDBC(PostgreSQL) 구현 완료 |
-| 과도한 요청 차단(429) | Nginx 설정 작성(`deploy/nginx.conf`), 운영 적용 전 |
-| EC2 배포 | 설정 작성(`deploy/`, `.github/workflows/deploy.yml`), 서버 미구축 |
+| 과도한 요청 차단(429) | Nginx 운영 적용(`deploy/nginx.conf`), 수치 조정 전 |
+| EC2 배포 | 운영 중(`api.desyp.site`, `main` push 자동 배포). SES 발신 주소·EBS 스냅샷 백업 미설정 |
 | 이벤트 종료 후 30일 내 파기 | 미구현 |
 
 ## 프로젝트 구성
