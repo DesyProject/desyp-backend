@@ -65,7 +65,7 @@ public class LoginRedirect implements AuthenticationSuccessHandler, Authenticati
     private String reason(AuthenticationException exception) {
         if (!(exception instanceof OAuth2AuthenticationException oauth)) return "failed";
         return switch (oauth.getError().getErrorCode()) {
-            case NaverOAuth2UserService.NO_EMAIL, NaverOAuth2UserService.NO_PHONE -> oauth.getError().getErrorCode();
+            case NaverOAuth2UserService.NO_EMAIL -> oauth.getError().getErrorCode();
             case "access_denied" -> "cancelled";
             default -> "failed";
         };

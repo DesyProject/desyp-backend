@@ -47,6 +47,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 ### 책임과 구현 상태
 
 - `subscriber`: 사전 등록, 동의, 중복 검증, 추천 관계와 보너스 저장
+- `conversion`: 카카오톡 채널 버튼 클릭 기록. 실제 채널 추가 여부가 아니다
 - `auth`: 네이버 로그인 시작·콜백 리다이렉트, 계정·프로필 확인, 관리자 허용 목록
 - `referral`: 내 점수와 관리자 공동 순위 조회
 - `mail`: 관리자 트리거 기반 SES 발송과 `notified_at` 중복 방지
@@ -59,9 +60,10 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 적용된 Flyway 마이그레이션은 수정하지 않고 새 버전을 추가한다.
 
 - 신규 인증과 등록은 네이버만 허용한다. `GOOGLE` enum 값은 기존 V1~V3 데이터 호환용이며 신규 등록에 사용하지 않는다.
-- `(provider, provider_account_id)`, `email_normalized`, `phone_number`는 각각 고유해야 한다.
-- `phone_number`는 네이버 `mobile` 프로필 값에서 숫자 형식으로 정규화하며 요청 본문으로 받지 않는다. 중복 확인에만 쓰고 어떤 API 응답에도 포함하지 않는다.
-- 추천인은 요청의 `referralCode`로 `invite_token`을 찾아 결정한다. 이메일과 휴대전화번호는 추천 식별자로 사용하지 않는다.
+- `(provider, provider_account_id)`, `email_normalized`는 각각 고유해야 한다.
+- 네이버에서는 계정 식별자와 이메일만 받는다(scope `email`). 휴대전화번호는 수집·저장하지 않으며 V8에서 `phone_number` 컬럼을 삭제했다.
+- 추천인은 요청의 `referralCode`로 `invite_token`을 찾아 결정한다. 이메일은 추천 식별자로 사용하지 않는다.
+- `kakao_channel_clicks`는 `(subscriber_id, source)` UNIQUE이며 `INSERT ... ON CONFLICT DO NOTHING`으로 동시 요청도 한 번만 저장한다. 등록자 삭제 시 함께 삭제된다(`ON DELETE CASCADE`).
 - 동의 3종(`age_confirmed`, `privacy_agreed`, `marketing_agreed`)은 모두 필수이며 `consent_at`에 동의 시각을 기록한다. 알림 메일은 `marketing_agreed`인 등록자에게만 보낸다.
 - `referrer_id`는 생성 후 변경하지 않으며 자기 자신을 가리킬 수 없다.
 - `referral_bonus`는 추천인이 있으면 1, 없으면 0이며 요청 값으로 받지 않는다.
@@ -74,7 +76,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 
 세션은 Spring Session JDBC로 PostgreSQL `SPRING_SESSION` 테이블(V7)에 저장해 서버 재시작이나 인스턴스 추가 후에도 유지한다. 만료 세션은 앱의 `cleanup-cron`(1분 주기)이 정리한다. 세션 쿠키 속성(`HttpOnly`, `SameSite=Lax`, `Secure`)은 Boot 속성이 내장 서버에서만 적용되므로 `SecurityConfig`의 `CookieSerializer`에서 지정한다.
 
-`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`는 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·휴대전화번호·네이버 식별자는 로그에 남기지 않는다.
+`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`와 `/api/conversions/kakao-channel-click`은 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·네이버 식별자는 로그에 남기지 않는다.
 
 ### 배포 전 확인
 
@@ -82,9 +84,9 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - Nginx 요청 제한(`429`) 운영 적용과 수치 조정. 사전 등록은 IP당 초당 1건(버스트 5), 그 외는 초당 10건(버스트 20)
 - 네이버 redirect-uri는 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Spring Boot는 `127.0.0.1`에만 바인딩하고 Nginx가 `X-Forwarded-*`를 덮어써 위조를 막는다. 보안 그룹은 80·443만 공개하고 8080은 열지 않는다
 - 이벤트 종료 후 30일 내 개인정보 파기. DB와 EBS 스냅샷 백업을 모두 포함한다
-- EventBridge Scheduler의 정확한 이벤트 시작 시각과 1시간 전 실행
-- 네이버 개발자센터의 이메일·휴대전화번호 제공 권한과 실제 OAuth 응답
-- 기존 Google 가입 데이터의 운영 전 정리 여부. V5는 데이터 손실을 피하기 위해 기존 행의 `phone_number`를 NULL로 유지한다.
+- EventBridge Scheduler 1시간 전 실행. 이벤트 시작은 2026-10-31 14:00 KST, 메일 발송은 13:00 KST
+- 네이버 개발자센터의 이메일 제공 권한과 실제 OAuth 응답. 휴대전화번호 제공 권한 해제
+- 기존 Google 가입 데이터의 운영 전 정리 여부
 - 실제 PostgreSQL과 SES 연결
 - 메일 실패 재시도와 발송 이력
 - 추천 집계 마감, 감사 가능한 동률 추첨과 결과 스냅샷

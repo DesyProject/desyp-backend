@@ -10,7 +10,7 @@ spring:
             authorization-grant-type: authorization_code
             # 요청 헤더로 계산하지 않고 고정한다. 예: https://api.desyp.site/auth/naver/callback
             redirect-uri: ${NAVER_REDIRECT_URI}
-            scope: email,mobile
+            scope: email
         provider:
           naver:
             authorization-uri: https://nid.naver.com/oauth2.0/authorize

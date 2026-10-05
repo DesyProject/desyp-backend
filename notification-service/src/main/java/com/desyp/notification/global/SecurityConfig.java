@@ -51,9 +51,9 @@ public class SecurityConfig {
                     .successHandler(loginRedirect).failureHandler(loginRedirect)
                     .userInfoEndpoint(userInfo -> userInfo.userService(naverOAuth2UserService)));
         }
-        // 프런트는 CSRF 토큰을 받지 않는다. 사전 등록은 SameSite=Lax 세션 쿠키, JSON 전용 요청,
+        // 프런트는 CSRF 토큰을 받지 않는다. 사전 등록과 전환 기록은 SameSite=Lax 세션 쿠키, JSON 전용 요청,
         // 프런트 Origin만 허용하는 CORS 사전 요청으로 교차 사이트 요청을 막는다. 관리자 API는 토큰을 유지한다.
-        http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/pre-registrations"));
+        http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/pre-registrations", "/api/conversions/kakao-channel-click"));
         http.cors(Customizer.withDefaults());
         return http.build();
     }
@@ -82,6 +82,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/me", config);
         source.registerCorsConfiguration("/api/pre-registrations", config);
         source.registerCorsConfiguration("/api/referrals/me", config);
+        source.registerCorsConfiguration("/api/conversions/kakao-channel-click", config);
         return source;
     }
 }

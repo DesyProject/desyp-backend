@@ -32,8 +32,8 @@ class RegistrationMailTest {
 
     @Test
     void sendsToEveryPendingSubscriberOnceAndSkipsAlreadyNotified() {
-        subscriberService.register(new SocialAccount("a", "a@naver.com", "010-0000-0001"), request());
-        subscriberService.register(new SocialAccount("b", "b@naver.com", "010-0000-0002"), request());
+        subscriberService.register(new SocialAccount("a", "a@naver.com"), request());
+        subscriberService.register(new SocialAccount("b", "b@naver.com"), request());
 
         int firstRun = registrationMailService.sendEventStartNotifications();
         assertThat(firstRun).isEqualTo(2);
