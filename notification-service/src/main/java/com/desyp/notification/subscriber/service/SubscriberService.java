@@ -20,7 +20,6 @@ import com.desyp.notification.subscriber.dto.SubscriberRegisterResponse;
 import com.desyp.notification.subscriber.entity.Subscriber;
 import com.desyp.notification.subscriber.repository.SubscriberRepository;
 import com.desyp.notification.subscriber.util.EmailNormalizer;
-import com.desyp.notification.subscriber.util.PhoneNumberNormalizer;
 
 import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.*;
 
@@ -64,15 +63,11 @@ public class SubscriberService {
             throw new BusinessException(VERIFIED_EMAIL_REQUIRED);
         }
         String normalizedEmail = EmailNormalizer.normalize(account.email());
-        String normalizedPhone = PhoneNumberNormalizer.normalize(account.phoneNumber());
         if (subscriberRepository.existsByProviderAndProviderAccountId(AuthProvider.NAVER, account.accountId())) {
             throw new BusinessException(DUPLICATE_SOCIAL_ACCOUNT);
         }
         if (subscriberRepository.existsByEmailNormalized(normalizedEmail)) {
             throw new BusinessException(DUPLICATE_EMAIL);
-        }
-        if (subscriberRepository.existsByPhoneNumber(normalizedPhone)) {
-            throw new BusinessException(DUPLICATE_PHONE);
         }
         Subscriber referrer = null;
         if (StringUtils.hasText(request.referralCode())) {
@@ -85,7 +80,6 @@ public class SubscriberService {
                 .providerAccountId(account.accountId())
                 .email(account.email())
                 .emailNormalized(normalizedEmail)
-                .phoneNumber(normalizedPhone)
                 .referrer(referrer)
                 .referralCode(newReferralCode())
                 .ageConfirmed(true)
