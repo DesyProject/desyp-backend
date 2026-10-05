@@ -7,9 +7,8 @@ import com.desyp.common.exception.BusinessException;
 
 import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.SOCIAL_LOGIN_REQUIRED;
 import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.VERIFIED_EMAIL_REQUIRED;
-import static com.desyp.notification.subscriber.exception.SubscriberErrorCode.VERIFIED_PHONE_REQUIRED;
 
-public record SocialAccount(String accountId, String email, String phoneNumber) {
+public record SocialAccount(String accountId, String email) {
 
     public static SocialAccount require(OAuth2AuthenticationToken authentication) {
         String registrationId = authentication == null ? null : authentication.getAuthorizedClientRegistrationId();
@@ -26,7 +25,6 @@ public record SocialAccount(String accountId, String email, String phoneNumber) 
         }
         String id = user.getAttribute("id");
         String email = user.getAttribute("email");
-        String phoneNumber = user.getAttribute("mobile");
         if (!StringUtils.hasText(id)) {
             throw new BusinessException(SOCIAL_LOGIN_REQUIRED);
         }
@@ -34,9 +32,6 @@ public record SocialAccount(String accountId, String email, String phoneNumber) 
         if (!StringUtils.hasText(email)) {
             throw new BusinessException(VERIFIED_EMAIL_REQUIRED);
         }
-        if (!StringUtils.hasText(phoneNumber)) {
-            throw new BusinessException(VERIFIED_PHONE_REQUIRED);
-        }
-        return new SocialAccount(id, email, phoneNumber);
+        return new SocialAccount(id, email);
     }
 }

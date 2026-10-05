@@ -25,7 +25,6 @@ class LoginRedirectTest {
     void failureRedirectsToReturnToWithReason() throws Exception {
         assertThat(failWith(new OAuth2AuthenticationException(new OAuth2Error("no_email"))))
                 .isEqualTo("https://www.desyp.site/?login=error&reason=no_email#entry-card");
-        assertThat(failWith(new OAuth2AuthenticationException(new OAuth2Error("no_phone")))).contains("reason=no_phone");
         assertThat(failWith(new OAuth2AuthenticationException(new OAuth2Error("access_denied")))).contains("reason=cancelled");
         assertThat(failWith(new BadCredentialsException("x"))).contains("reason=failed");
     }

@@ -22,7 +22,7 @@ class RegistrationClosedTest {
     @Test
     void rejectsRegistrationAfterDeadlineWithGone() {
         repository.deleteAllInBatch();
-        assertThatThrownBy(() -> service.register(new SocialAccount("late", "late@naver.com", "010-8000-0001"),
+        assertThatThrownBy(() -> service.register(new SocialAccount("late", "late@naver.com"),
                 new SubscriberRegisterRequest(true, true, true, null)))
                 .isInstanceOfSatisfying(BusinessException.class,
                         e -> assertThat(e.getErrorCode().getHttpStatus()).isEqualTo(HttpStatus.GONE));
