@@ -11,7 +11,6 @@
 | --- | --- | --- |
 | `common` | 공통 응답과 예외 | 라이브러리 |
 | `notification-service` | 사전 등록, 추천 점수·순위, 메일 | AWS EC2 한 대 (Nginx + systemd + PostgreSQL) |
-| `event-entry-service` | 이벤트 당일 응모 | k3s |
 
 Java 21, Spring Boot 4.1.1, Gradle Groovy를 사용한다. Spring Boot 4.x 기준으로 `jakarta.*` 패키지를 사용한다.
 
@@ -92,28 +91,9 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - 추천 집계 마감, 감사 가능한 동률 추첨과 결과 스냅샷
 - EC2 초기 설정(Java 21, Nginx, 인증서, systemd, IAM 역할)과 배포 secrets 등록. 절차는 README의 EC2 배포
 
-## event-entry-service
+## 이벤트 당일 응모
 
-현재 소스 코드가 없는 설계 단계다. 사전 등록 추천 점수와 이벤트 시작 메일은 `notification-service` 책임이며, 이벤트 응모에서 추천 보너스를 다시 지급하지 않는다.
-
-### 확정 사항
-
-- 목표 규모는 DAU 10,000명, 10분간 1,000 QPS다.
-- Java 21 Virtual Thread, k3s, Redis, PostgreSQL을 사용한다.
-- 인당 응모 횟수는 제한하지 않는다.
-- 동일 Instagram ID의 요청 간격을 서버에서 최소 1초로 제한한다.
-- 클라이언트 지연은 매크로 방어 수단으로 인정하지 않는다.
-- 접수 번호는 당첨 정책이 확정되기 전까지 내부 감사 식별자로만 사용한다.
-- 결과 팝업은 `OK`로만 닫으며, 실패나 결과 대기 상태에도 안내 문구와 `OK`를 제공한다.
-
-### 설계 후보와 미정 사항
-
-- Redis 원자 연산으로 rate limit 확인, 접수 번호 증가, Stream 기록을 한 번에 처리한다.
-- Stream을 PostgreSQL에 비동기 배치 적재하는 기존 후보 구조는 부하 테스트 후 확정한다.
-- 고정 순번과 랜덤 중 당첨 방식을 정한 후에만 당첨 데이터 모델과 문구를 고정한다.
-- 정책 확정 전에는 `1번째`, `N번째`, `10,000번째` 같은 순번을 당첨 조건으로 구현하지 않는다.
-
-응모 레코드 후보 필드는 `seq`, `insta_id`, `submitted_at`, `token_hash`, `ip_hash`, `created_at`이다. `insta_id`에는 UNIQUE 제약을 두지 않는다.
+이 저장소에서 분리해 별도 저장소에서 만든다. 사전 등록 추천 점수와 이벤트 시작 메일은 `notification-service` 책임이며, 이벤트 응모에서 추천 보너스를 다시 지급하지 않는다.
 
 ## 프런트엔드와 인프라
 

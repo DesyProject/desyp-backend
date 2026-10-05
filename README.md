@@ -1,6 +1,6 @@
 # desyp-backend
 
-사전 등록·추천 이벤트와 이벤트 당일 응모를 위한 Java 21 / Spring Boot 멀티모듈 백엔드다.
+사전 등록·추천 이벤트를 위한 Java 21 / Spring Boot 멀티모듈 백엔드다. 이벤트 당일 응모 서비스는 별도 저장소에서 만든다.
 
 ## 제품 정책
 
@@ -91,7 +91,7 @@ entryButton.addEventListener('click', () =>
 | SES 알림 | 관리자 수동 트리거 구현 완료 |
 | 1시간 전 자동 발송 | EventBridge Scheduler 미구현 |
 | 최고점 동률 추첨·결과 공개 | 미구현 |
-| 이벤트 당일 응모 | 설계 단계 |
+| 이벤트 당일 응모 | 별도 저장소로 분리, 설계 단계 |
 | 브라우저 고유값(`X-Client-Id`) | 설계 단계 |
 | 사전 등록 페이지 | Vercel 배포 ([desyp-event](https://github.com/DesyProject/desyp-event)) |
 | 메인 이벤트 페이지 | 비공개 S3 + CloudFront OAC 사용 확정 |
@@ -110,7 +110,6 @@ entryButton.addEventListener('click', () =>
 
 - `common`: 공통 응답과 예외
 - `notification-service`: 사전 등록, 추천 점수·순위, 이메일 발송
-- `event-entry-service`: 이벤트 당일 응모. 현재 코드 없음
 
 개발 규칙과 상세 설계는 [CLAUDE.md](CLAUDE.md), 에이전트 작업 규칙은 [AGENTS.md](AGENTS.md)를 참고한다.
 
