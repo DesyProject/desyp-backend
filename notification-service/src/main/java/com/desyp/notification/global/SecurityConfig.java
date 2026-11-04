@@ -60,7 +60,7 @@ public class SecurityConfig {
 
     /**
      * Spring Boot는 내장 웹 서버를 띄울 때만 server.servlet.session.cookie.*를 세션 쿠키에 적용한다.
-     * Lambda 서블릿 어댑터에서도 같은 속성을 쓰도록 직접 지정한다.
+     * 외부 서블릿 컨테이너나 어댑터에서도 같은 속성을 쓰도록 직접 지정한다.
      */
     @Bean
     CookieSerializer cookieSerializer(@Value("${server.servlet.session.cookie.secure:true}") boolean secure) {

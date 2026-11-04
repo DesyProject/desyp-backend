@@ -15,9 +15,13 @@ public class FakeMailSender implements MailSender {
     }
 
     private final List<SentMail> sent = new CopyOnWriteArrayList<>();
+    private volatile String crashOn;
 
     @Override
     public void send(String to, String subject, String body) {
+        if (to.equals(crashOn)) {
+            throw new Error("simulated crash");
+        }
         sent.add(new SentMail(to, subject, body));
     }
 
@@ -25,7 +29,12 @@ public class FakeMailSender implements MailSender {
         return Collections.unmodifiableList(sent);
     }
 
+    public void crashOn(String to) {
+        crashOn = to;
+    }
+
     public void clear() {
         sent.clear();
+        crashOn = null;
     }
 }
