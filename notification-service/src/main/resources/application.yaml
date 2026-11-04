@@ -26,4 +26,4 @@ desyp:
     # 로그인 후 return_to 허용 범위와 CORS 허용 Origin. 로컬 개발은 http://localhost:5173
     origin: ${FRONTEND_ORIGIN:https://www.desyp.site}
   registration:
-    end-at: ${REGISTRATION_END_AT:2026-10-30T23:59:59+09:00}
+    end-at: ${REGISTRATION_END_AT:2026-11-27T23:59:59+09:00}
