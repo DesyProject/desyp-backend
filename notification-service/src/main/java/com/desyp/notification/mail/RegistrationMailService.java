@@ -19,7 +19,12 @@ public class RegistrationMailService {
 
     private static final Logger log = LoggerFactory.getLogger(RegistrationMailService.class);
     private static final String SUBJECT = "[desyp] 이벤트가 곧 시작됩니다";
-    private static final String BODY = "사전 등록해주셔서 감사합니다. 이벤트가 곧 시작됩니다.";
+    private static final String BODY = """
+            사전 등록해주셔서 감사합니다. 이벤트가 곧 시작됩니다.
+
+            일정과 공지를 카카오톡으로도 받아보세요.
+            https://pf.kakao.com/_ExbgxiX
+            """;
 
     private final SubscriberRepository subscriberRepository;
     private final MailSender mailSender;

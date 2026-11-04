@@ -43,6 +43,7 @@ class RegistrationMailTest {
         assertThat(firstRun).isEqualTo(2);
         assertThat(mailSender.sent()).extracting(FakeMailSender.SentMail::to)
                 .containsExactlyInAnyOrder("a@naver.com", "b@naver.com");
+        assertThat(mailSender.sent()).allSatisfy(mail -> assertThat(mail.body()).contains("https://pf.kakao.com/_ExbgxiX"));
         assertThat(repository.findAll()).allSatisfy(subscriber -> assertThat(subscriber.getNotifiedAt()).isNotNull());
 
         int secondRun = registrationMailService.sendEventStartNotifications();
