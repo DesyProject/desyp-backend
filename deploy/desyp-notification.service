@@ -1,9 +1,10 @@
 # /etc/systemd/system/desyp-notification.service
 [Unit]
 Description=desyp notification-service
-After=network-online.target postgresql.service
+# Ubuntu의 postgresql.service는 빈 래퍼라 실제 클러스터 유닛을 기다린다.
+After=network-online.target postgresql@18-main.service
 Wants=network-online.target
-Requires=postgresql.service
+Requires=postgresql@18-main.service
 
 [Service]
 User=desyp

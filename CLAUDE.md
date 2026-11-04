@@ -68,7 +68,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - `referral_bonus`는 추천인이 있으면 1, 없으면 0이며 요청 값으로 받지 않는다.
 - 실제 추천 인원은 `referrer_id` 관계를 조회 시 `COUNT`한다. 누적 카운터를 별도로 저장하지 않는다.
 - 순위는 추천 인원과 보너스를 한 SQL에서 계산하고 `1, 1, 3` 공동 순위를 사용한다.
-- 이메일은 소문자화, `+` 별칭 제거, Gmail 점 제거, `googlemail.com` 통합 후 중복을 검사한다.
+- 이메일은 소문자화 후 중복을 검사한다. Gmail(`gmail.com`·`googlemail.com`)만 `+` 별칭과 점을 제거하고 `gmail.com`으로 통합한다. 다른 도메인의 `+`는 주소의 일부로 보존한다.
 - 메일 성공 시에만 `notified_at`을 기록한다.
 
 내 점수는 로그인 계정으로만 조회한다. 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
@@ -80,10 +80,10 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 ### 배포 전 확인
 
 - EventBridge 연동 전에 메일 발송 상태를 별도 테이블로 관리한다. 수신자·이벤트 키 UNIQUE, 상태 선점, 시도 횟수, SES message ID를 기록하고 동시 실행과 재시도를 검증한다
-- Nginx 요청 제한(`429`) 운영 적용과 수치 조정. 사전 등록은 IP당 초당 1건(버스트 5), 그 외는 초당 10건(버스트 20)
+- Nginx 요청 제한(`429`) 운영 적용과 수치 조정. 사전 등록은 IP당 초당 1건(버스트 5, CORS 사전 요청 제외), 그 외는 초당 10건(버스트 20)
 - 네이버 redirect-uri는 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Spring Boot는 `127.0.0.1`에만 바인딩하고 Nginx가 `X-Forwarded-*`를 덮어써 위조를 막는다. 보안 그룹은 80·443만 공개하고 8080은 열지 않는다
 - 이벤트 종료 후 30일 내 개인정보 파기. DB와 EBS 스냅샷 백업을 모두 포함한다
-- EventBridge Scheduler 1시간 전 실행. 이벤트 시작은 2026-10-31 14:00 KST, 메일 발송은 13:00 KST
+- EventBridge Scheduler 1시간 전 실행. 이벤트 시작은 2026-11-28 14:00 KST, 메일 발송은 13:00 KST
 - 네이버 개발자센터의 이메일 제공 권한과 실제 OAuth 응답. 휴대전화번호 제공 권한 해제
 - 기존 Google 가입 데이터의 운영 전 정리 여부
 - 실제 PostgreSQL과 SES 연결

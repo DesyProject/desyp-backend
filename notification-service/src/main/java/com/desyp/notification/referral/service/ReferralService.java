@@ -26,9 +26,6 @@ public class ReferralService {
     }
 
     public List<ReferralRankingResponse> ranking(int maxRank) {
-        if (maxRank < 1 || maxRank > 100) {
-            throw new IllegalArgumentException("maxRank must be between 1 and 100");
-        }
         return referralRepository.findRanking(maxRank).stream()
                 .map(score -> new ReferralRankingResponse(score.getRanking(), score.getSubscriberId(),
                         score.getEmail(), score.getReferralCount(),

@@ -6,7 +6,7 @@ import java.time.ZoneOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.desyp.notification.subscriber.entity.Subscriber;
 import com.desyp.notification.subscriber.repository.SubscriberRepository;
@@ -23,20 +23,36 @@ public class RegistrationMailService {
 
     private final SubscriberRepository subscriberRepository;
     private final MailSender mailSender;
+    private final TransactionTemplate transactionTemplate;
 
-    @Transactional
+    /**
+     * 수신자마다 트랜잭션을 나눠 중간에 서버가 죽어도 이미 보낸 기록은 남긴다.
+     * 행 잠금으로 동시 실행이 같은 수신자에게 보내지 않게 한다.
+     * 발송 직후 커밋 전에 죽으면 그 한 명만 다음 실행에서 다시 받는다.
+     */
     public int sendEventStartNotifications() {
-        var pending = subscriberRepository.findByNotifiedAtIsNullAndMarketingAgreedTrue();
         int sent = 0;
-        for (Subscriber subscriber : pending) {
-            try {
-                mailSender.send(subscriber.getEmail(), SUBJECT, BODY);
-                subscriber.markNotified(OffsetDateTime.now(ZoneOffset.UTC));
+        for (Long id : subscriberRepository.findPendingNotificationIds()) {
+            if (Boolean.TRUE.equals(transactionTemplate.execute(status -> sendIfPending(id)))) {
                 sent++;
-            } catch (RuntimeException exception) {
-                log.warn("이벤트 알림 메일 발송 실패: subscriberId={}", subscriber.getId(), exception);
             }
         }
         return sent;
+    }
+
+    private boolean sendIfPending(Long id) {
+        Subscriber subscriber = subscriberRepository.findByIdForUpdate(id).orElse(null);
+        if (subscriber == null || subscriber.getNotifiedAt() != null) {
+            return false;
+        }
+        try {
+            mailSender.send(subscriber.getEmail(), SUBJECT, BODY);
+        } catch (RuntimeException exception) {
+            // SES 오류 메시지에 수신자 이메일이 들어갈 수 있어 예외 종류만 남긴다.
+            log.warn("이벤트 알림 메일 발송 실패: subscriberId={}, error={}", id, exception.getClass().getSimpleName());
+            return false;
+        }
+        subscriber.markNotified(OffsetDateTime.now(ZoneOffset.UTC));
+        return true;
     }
 }
