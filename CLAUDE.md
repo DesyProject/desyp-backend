@@ -83,7 +83,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - Nginx 요청 제한(`429`) 운영 적용과 수치 조정. 사전 등록은 IP당 초당 1건(버스트 5, CORS 사전 요청 제외), 그 외는 초당 10건(버스트 20)
 - 네이버 redirect-uri는 요청 헤더로 계산하지 않고 `NAVER_REDIRECT_URI`로 고정한다. Spring Boot는 `127.0.0.1`에만 바인딩하고 Nginx가 `X-Forwarded-*`를 덮어써 위조를 막는다. 보안 그룹은 80·443만 공개하고 8080은 열지 않는다
 - 이벤트 종료 후 30일 내 개인정보 파기. DB와 EBS 스냅샷 백업을 모두 포함한다
-- EventBridge Scheduler 1시간 전 실행. 이벤트 시작은 2026-11-28 14:00 KST, 메일 발송은 13:00 KST
+- EventBridge Scheduler 1시간 전 실행. 이벤트 시작은 2026-11-29 14:00 KST, 메일 발송은 13:00 KST
 - 네이버 개발자센터의 이메일 제공 권한과 실제 OAuth 응답. 휴대전화번호 제공 권한 해제
 - 기존 Google 가입 데이터의 운영 전 정리 여부
 - 실제 PostgreSQL과 SES 연결
