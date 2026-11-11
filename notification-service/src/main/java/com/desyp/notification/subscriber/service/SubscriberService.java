@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.security.SecureRandom;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -30,6 +31,7 @@ public class SubscriberService {
     private static final String REFERRAL_CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
     private static final int REFERRAL_CODE_LENGTH = 8;
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Pattern UTM_SOURCE = Pattern.compile("[a-z0-9_-]{1,32}");
 
     private final SubscriberRepository subscriberRepository;
     private final OffsetDateTime registrationEndAt;
@@ -86,6 +88,7 @@ public class SubscriberService {
                 .privacyAgreed(true)
                 .marketingAgreed(true)
                 .consentAt(now)
+                .utmSource(utmSource(request.utmSource()))
                 .build();
         try {
             subscriberRepository.saveAndFlush(subscriber);
@@ -94,6 +97,13 @@ public class SubscriberService {
             throw new BusinessException(REGISTRATION_CONFLICT);
         }
         return new SubscriberRegisterResponse(subscriber.getId(), subscriber.getReferralCode());
+    }
+
+    /** 유입 경로는 통계용이라 형식이 맞지 않으면 등록을 막지 않고 버린다. */
+    static String utmSource(String value) {
+        if (value == null) return null;
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        return UTM_SOURCE.matcher(normalized).matches() ? normalized : null;
     }
 
     private String newReferralCode() {
