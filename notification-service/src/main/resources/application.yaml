@@ -20,6 +20,9 @@ logging:
 desyp:
   admin:
     naver-account-ids: ${ADMIN_NAVER_ACCOUNT_IDS:}
+    dashboard:
+      username: ${ADMIN_DASHBOARD_USERNAME:}
+      password: ${ADMIN_DASHBOARD_PASSWORD:}
   mail:
     sender-email: ${SES_SENDER_EMAIL:}
   frontend:

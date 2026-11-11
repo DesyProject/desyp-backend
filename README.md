@@ -126,6 +126,7 @@ Java 21과 PostgreSQL을 준비하고 다음 환경 변수를 설정한다.
 - `SPRING_PROFILES_ACTIVE=oauth`. 로컬은 `oauth,local`이며 `local` 프로필이 CORS·`return_to` Origin `http://localhost:5173`, 로컬 redirect-uri, 비Secure 세션 쿠키를 설정한다
 - `FRONTEND_ORIGIN`: 기본 `https://www.desyp.site`. 로컬 프런트는 `http://localhost:5173`
 - `REGISTRATION_END_AT`: 기본 `2026-11-28T23:59:59+09:00`
+- `ADMIN_DASHBOARD_USERNAME`, `ADMIN_DASHBOARD_PASSWORD`: 관리자 대시보드 로그인 계정. 추측하기 어려운 긴 비밀번호를 쓴다
 
 네이버 Callback URL은 `{백엔드 외부 주소}/auth/naver/callback`(예: `https://api.desyp.site/auth/naver/callback`), 서비스 URL은 `https://www.desyp.site`다. 백엔드는 프런트와 같은 사이트인 `api.desyp.site` 같은 하위 도메인에 두어 `SameSite=Lax` 세션 쿠키를 쓴다. 네이버 개발자센터에서 이메일 제공 권한을 신청·활성화한다. 휴대전화번호 제공 권한은 쓰지 않으므로 해제한다. 운영에서는 HTTPS와 Secure 세션 쿠키를 사용하고, 로컬 HTTP에서만 `SESSION_COOKIE_SECURE=false`를 쓴다.
 
@@ -277,7 +278,7 @@ Ubuntu 26.04 LTS, t3.micro(메모리 1GB) 한 대에 PostgreSQL을 함께 설치
 
 `https://api.desyp.site/admin.html`
 
-등록자 수, 추천 코드 사용률, 카카오톡 채널 버튼 클릭률, 알림 메일 발송 현황, 마감까지 남은 시간, 한국 시간 기준 일별 추이, 추천왕 TOP 10을 보여준다. 페이지는 공개 정적 파일이고 데이터는 `GET /api/admin/stats?days=14`(1~90)로 관리자만 받는다. 로그인하지 않았으면 `/auth/naver/login?return_to=/admin.html`로 로그인 후 돌아온다. 추천왕 목록에는 당첨자 연락용 이메일 원문이 표시된다.
+등록자 수, 추천 코드 사용률, 카카오톡 채널 버튼 클릭률, 알림 메일 발송 현황, 마감까지 남은 시간, 한국 시간 기준 일별 추이, 추천왕 TOP 10을 보여준다. 페이지와 데이터 API `GET /api/admin/stats?days=14`(1~90)는 브라우저 기본 로그인 창(HTTP Basic)으로 `ADMIN_DASHBOARD_USERNAME`·`ADMIN_DASHBOARD_PASSWORD` 계정만 접근한다. 값이 비어 있으면 모두 거부한다. 추천왕 목록에는 당첨자 연락용 이메일 원문이 표시된다.
 
 ### 이벤트 알림 메일
 

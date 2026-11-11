@@ -71,11 +71,11 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - 이메일은 소문자화 후 중복을 검사한다. Gmail(`gmail.com`·`googlemail.com`)만 `+` 별칭과 점을 제거하고 `gmail.com`으로 통합한다. 다른 도메인의 `+`는 주소의 일부로 보존한다.
 - 메일 성공 시에만 `notified_at`을 기록한다.
 
-내 점수는 로그인 계정으로만 조회한다. 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
+내 점수는 로그인 계정으로만 조회한다. 관리자 대시보드(`/admin.html`, `/api/admin/stats`)는 별도 필터 체인에서 환경 변수 계정의 HTTP Basic 인증만 받고 세션을 만들지 않는다. 그 밖의 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
 
 세션은 Spring Session JDBC로 PostgreSQL `SPRING_SESSION` 테이블(V7)에 저장해 서버 재시작이나 인스턴스 추가 후에도 유지한다. 만료 세션은 앱의 `cleanup-cron`(1분 주기)이 정리한다. 세션 쿠키 속성(`HttpOnly`, `SameSite=Lax`, `Secure`)은 Boot 속성이 내장 서버에서만 적용되므로 `SecurityConfig`의 `CookieSerializer`에서 지정한다.
 
-`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용하고, 예외로 관리자 대시보드 상대 경로 `/admin.html`만 허용한다. `/api/pre-registrations`와 `/api/conversions/kakao-channel-click`은 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·네이버 식별자는 로그에 남기지 않는다.
+`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`와 `/api/conversions/kakao-channel-click`은 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·네이버 식별자는 로그에 남기지 않는다.
 
 ### 배포 전 확인
 

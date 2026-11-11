@@ -30,7 +30,6 @@
         .bar { height: 6px; background: var(--accent); border-radius: 3px; min-width: 2px; }
         .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #e8f0fe; color: var(--accent); }
         #error { color: #c92a2a; }
-        #error a { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -142,22 +141,15 @@
             }));
     }
 
-    function showError(message, withLogin) {
-        const error = $("#error");
-        error.textContent = message;
-        if (withLogin) {
-            const link = el("a", "네이버로 로그인");
-            link.href = "/auth/naver/login?return_to=/admin.html";
-            error.append(" ", link);
-        }
+    function showError(message) {
+        $("#error").textContent = message;
     }
 
     async function load() {
         $("#error").textContent = "";
         try {
             const response = await fetch(`/api/admin/stats?days=${$("#days").value}`, { credentials: "same-origin" });
-            if (response.status === 401) return showError("로그인이 필요합니다.", true);
-            if (response.status === 403) return showError("관리자 계정이 아닙니다. 다른 네이버 계정으로 로그인하세요.", true);
+            if (response.status === 401) return showError("로그인이 만료됐습니다. 페이지를 새로고침해 다시 로그인하세요.");
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             render((await response.json()).data);
         } catch (error) {
