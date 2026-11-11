@@ -36,9 +36,17 @@ public interface SubscriberRepository extends JpaRepository<Subscriber, Long> {
 
     List<RegistrationTime> findByCreatedAtGreaterThanEqual(OffsetDateTime from);
 
+    @Query("select s.utmSource as source, count(s) as count from Subscriber s group by s.utmSource order by count(s) desc")
+    List<SourceCount> countByUtmSource();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from Subscriber s where s.id = :id")
     Optional<Subscriber> findByIdForUpdate(Long id);
+
+    interface SourceCount {
+        String getSource();
+        long getCount();
+    }
 
     interface RegistrationTime {
         OffsetDateTime getCreatedAt();

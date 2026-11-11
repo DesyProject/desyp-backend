@@ -106,7 +106,7 @@ entryButton.addEventListener('click', () =>
 | 사용자별 카카오톡 채널 친구 여부 조회 | 미구현 |
 | 알림톡 API·카카오 메시지 자동 발송 | 미구현 |
 | 사전 등록자와 이벤트 참여자를 잇는 참여 토큰 | 미구현 |
-| 관리자 대시보드(`/admin.html`) | 구현 완료(등록·추천·채널 클릭·메일 발송 집계) |
+| 관리자 대시보드(`/admin.html`) | 구현 완료(등록·추천·채널 클릭·메일 발송·유입 경로 집계) |
 
 ## 프로젝트 구성
 
@@ -223,10 +223,10 @@ Ubuntu 26.04 LTS, t3.micro(메모리 1GB) 한 대에 PostgreSQL을 함께 설치
 `POST /api/pre-registrations` (`Content-Type: application/json`만 허용)
 
 ```json
-{"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referralCode":"7K2QM9XA"}
+{"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"referralCode":"7K2QM9XA","utmSource":"instagram"}
 ```
 
-이메일은 요청 본문이 아니라 네이버 프로필에서만 가져온다. `referralCode`는 선택이며 기존 등록자의 추천 코드와 일치해야 한다. 추천 코드는 혼동 문자(0·O·1·I·L)를 뺀 대문자·숫자 8자리이고, 앞뒤 공백과 소문자 입력은 정규화한다. 등록 성공 응답과 내 추천 점수 응답은 본인의 `referralCode`를 반환한다.
+이메일은 요청 본문이 아니라 네이버 프로필에서만 가져온다. `referralCode`는 선택이며 기존 등록자의 추천 코드와 일치해야 한다. 추천 코드는 혼동 문자(0·O·1·I·L)를 뺀 대문자·숫자 8자리이고, 앞뒤 공백과 소문자 입력은 정규화한다. 등록 성공 응답과 내 추천 점수 응답은 본인의 `referralCode`를 반환한다. `utmSource`는 선택이며 홍보 링크의 `?utm_source=` 값을 보낸다. 소문자로 바꾼 뒤 영문 소문자·숫자·`_`·`-` 1~32자만 저장하고, 형식이 다르면 오류 없이 버린다.
 
 | 코드 | 의미 |
 | --- | --- |
@@ -278,7 +278,7 @@ Ubuntu 26.04 LTS, t3.micro(메모리 1GB) 한 대에 PostgreSQL을 함께 설치
 
 `https://api.desyp.site/admin.html`
 
-등록자 수, 추천 코드 사용률, 카카오톡 채널 버튼 클릭률, 알림 메일 발송 현황, 마감까지 남은 시간, 한국 시간 기준 일별 추이, 추천왕 TOP 10을 보여준다. 페이지와 데이터 API `GET /api/admin/stats?days=14`(1~90)는 브라우저 기본 로그인 창(HTTP Basic)으로 `ADMIN_DASHBOARD_USERNAME`·`ADMIN_DASHBOARD_PASSWORD` 계정만 접근한다. 값이 비어 있으면 모두 거부한다. 추천왕 목록에는 당첨자 연락용 이메일 원문이 표시된다.
+등록자 수, 추천 코드 사용률, 카카오톡 채널 버튼 클릭률, 알림 메일 발송 현황, 마감까지 남은 시간, 한국 시간 기준 일별 추이, 추천왕 TOP 10, 유입 경로(`utm_source`)별 등록 수를 보여준다. 페이지와 데이터 API `GET /api/admin/stats?days=14`(1~90)는 브라우저 기본 로그인 창(HTTP Basic)으로 `ADMIN_DASHBOARD_USERNAME`·`ADMIN_DASHBOARD_PASSWORD` 계정만 접근한다. 값이 비어 있으면 모두 거부한다. 추천왕 목록에는 당첨자 연락용 이메일 원문이 표시된다.
 
 ### 이벤트 알림 메일
 

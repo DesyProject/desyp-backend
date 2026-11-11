@@ -87,7 +87,7 @@ class SubscriberRegistrationTest {
     }
 
     private SubscriberRegisterRequest request(String referralCode) {
-        return new SubscriberRegisterRequest(true, true, true, referralCode);
+        return new SubscriberRegisterRequest(true, true, true, referralCode, null);
     }
 
     private String body(String referralCode) {
@@ -283,6 +283,26 @@ class SubscriberRegistrationTest {
     }
 
     @Test
+    void storesNormalizedUtmSourceAndCountsItInStats() throws Exception {
+        mvc.perform(post("/api/pre-registrations").with(naver("u1", "u1@naver.com"))
+                        .contentType(MediaType.APPLICATION_JSON).content("""
+                                {"ageConfirmed":true,"agreePrivacy":true,"agreeMarketing":true,"utmSource":" Instagram "}
+                                """))
+                .andExpect(status().isCreated());
+        service.register(account("u2", "u2@naver.com"), new SubscriberRegisterRequest(true, true, true, null, "<script>"));
+        service.register(account("u3", "u3@naver.com"), new SubscriberRegisterRequest(true, true, true, null, "instagram"));
+
+        assertThat(jdbc.queryForList("SELECT utm_source FROM subscribers ORDER BY id", String.class))
+                .containsExactly("instagram", null, "instagram");
+        mvc.perform(get("/api/admin/stats").with(httpBasic("dash", "dash-pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sources[0].source").value("instagram"))
+                .andExpect(jsonPath("$.data.sources[0].count").value(2))
+                .andExpect(jsonPath("$.data.sources[1].source").doesNotExist())
+                .andExpect(jsonPath("$.data.sources[1].count").value(1));
+    }
+
+    @Test
     void adminCanSendMailAndInvalidRankingBoundsFail() throws Exception {
         mvc.perform(post("/api/admin/mail/event-start")
                         .with(naver("admin-user", "admin@naver.com")).with(csrf()))
@@ -314,7 +334,7 @@ class SubscriberRegistrationTest {
         var a = service.register(account("a", "a@naver.com"), request(null));
         assertThatThrownBy(() -> service.register(
                 account("b", "b@naver.com"),
-                new SubscriberRegisterRequest(true, true, false, a.referralCode())))
+                new SubscriberRegisterRequest(true, true, false, a.referralCode(), null)))
                 .isInstanceOf(BusinessException.class);
         assertThat(referrals.myScore("a").totalScore()).isZero();
     }
