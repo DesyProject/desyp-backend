@@ -113,7 +113,7 @@ public class SubscriberService {
         return code.toString();
     }
 
-    static String mask(String email) {
+    public static String mask(String email) {
         int at = email.indexOf('@');
         if (at < 0) return "***";
         String local = email.substring(0, at);

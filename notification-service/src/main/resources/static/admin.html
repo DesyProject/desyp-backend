@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>desyp 관리자</title>
+    <style>
+        :root { --ink: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea; --bg: #f6f6f8; --accent: #2f6fed; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; color: var(--ink); background: var(--bg); }
+        main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+        header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        h1 { font-size: 20px; margin: 0; }
+        h2 { font-size: 15px; margin: 0 0 12px; }
+        .muted { color: var(--muted); font-size: 12px; }
+        select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+        button { cursor: pointer; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin: 20px 0; }
+        .card, .panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+        .card .label { color: var(--muted); font-size: 12px; }
+        .card .value { font-size: 26px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .card .sub { color: var(--muted); font-size: 12px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+        th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+        th { color: var(--muted); font-weight: 500; font-size: 12px; }
+        td.num, th.num { text-align: right; }
+        td.bar-cell { width: 30%; }
+        .bar { height: 6px; background: var(--accent); border-radius: 3px; min-width: 2px; }
+        .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: #e8f0fe; color: var(--accent); }
+        #error { color: #c92a2a; }
+        #error a { color: var(--accent); }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <div>
+            <h1>desyp 사전 등록 대시보드</h1>
+            <div class="muted" id="generatedAt"></div>
+        </div>
+        <div>
+            <select id="days" aria-label="조회 기간">
+                <option value="1">오늘</option>
+                <option value="7">최근 7일</option>
+                <option value="14" selected>최근 14일</option>
+                <option value="30">최근 30일</option>
+                <option value="90">최근 90일</option>
+            </select>
+            <button id="refresh" type="button">새로고침</button>
+        </div>
+    </header>
+    <p id="error" role="alert"></p>
+
+    <section class="cards" id="cards" aria-label="핵심 지표"></section>
+
+    <section class="grid">
+        <div class="panel"><h2>일별 추이</h2><p class="muted">한국 시간 기준. 채널 클릭은 버튼 클릭이며 실제 채널 추가가 아닙니다.</p><table id="daily"></table></div>
+        <div class="panel"><h2>추천왕 TOP 10</h2><p class="muted">1·2위가 상품 대상(동점이면 추첨). 연락용 이메일 원문은 /api/admin/referrals/ranking</p><table id="ranking"></table></div>
+    </section>
+</main>
+
+<script>
+    const $ = (selector) => document.querySelector(selector);
+    const pct = (part, whole) => whole ? `${Math.round((part / whole) * 100)}%` : "-";
+
+    function el(tag, text, className) {
+        const node = document.createElement(tag);
+        if (text != null) node.textContent = text;
+        if (className) node.className = className;
+        return node;
+    }
+
+    function untilClose(endAt) {
+        const ms = new Date(endAt) - Date.now();
+        if (ms <= 0) return "마감";
+        const days = Math.floor(ms / 86400000);
+        const hours = Math.floor((ms % 86400000) / 3600000);
+        return days ? `D-${days} ${hours}시간` : `${hours}시간`;
+    }
+
+    function renderCards(stats) {
+        const s = stats.summary;
+        const today = stats.daily[stats.daily.length - 1];
+        const inPeriod = stats.daily.reduce((sum, d) => sum + d.registrations, 0);
+        const cards = [
+            ["사전 등록자", s.subscribers, `오늘 +${today.registrations}`],
+            [`기간 내 등록 (${stats.days}일)`, inPeriod, `일평균 ${(inPeriod / stats.days).toFixed(1)}명`],
+            ["추천 코드 사용률", pct(s.referred, s.subscribers), `추천 코드로 등록 ${s.referred} / 전체 ${s.subscribers}`],
+            ["카카오 채널 클릭률", pct(s.kakaoClicks, s.subscribers), `클릭 ${s.kakaoClicks} / 전체 ${s.subscribers}`],
+            ["알림 메일 발송", pct(s.mailSent, s.mailTargets), `발송 ${s.mailSent} / 대상 ${s.mailTargets}`],
+            ["사전 등록 마감까지", untilClose(stats.registrationEndAt), new Date(stats.registrationEndAt).toLocaleString("ko-KR")]
+        ];
+        $("#cards").replaceChildren(...cards.map(([label, value, sub]) => {
+            const card = el("div", null, "card");
+            card.append(el("div", label, "label"), el("div", String(value), "value"), el("div", sub, "sub"));
+            return card;
+        }));
+    }
+
+    function renderTable(table, headers, rows) {
+        const head = el("tr");
+        headers.forEach(([text, numeric]) => head.append(el("th", text, numeric ? "num" : null)));
+        const body = rows.length ? rows.map((cells) => {
+            const tr = el("tr");
+            cells.forEach((cell, i) => {
+                const td = el("td", null, cell instanceof Node && cell.className === "bar" ? "bar-cell" : headers[i]?.[1] ? "num" : null);
+                td.append(cell instanceof Node ? cell : document.createTextNode(String(cell)));
+                tr.append(td);
+            });
+            return tr;
+        }) : [(() => {
+            const tr = el("tr");
+            const td = el("td", "데이터 없음", "muted");
+            td.colSpan = headers.length;
+            tr.append(td);
+            return tr;
+        })()];
+        table.replaceChildren(el("thead"), el("tbody"));
+        table.tHead.append(head);
+        table.tBodies[0].append(...body);
+    }
+
+    function bar(count, max) {
+        const node = el("div", null, "bar");
+        node.style.width = `${max ? (count / max) * 100 : 0}%`;
+        return node;
+    }
+
+    function render(stats) {
+        $("#generatedAt").textContent = `기준 시각 ${new Date(stats.generatedAt).toLocaleString("ko-KR")} · 최근 ${stats.days}일`;
+        renderCards(stats);
+        const max = Math.max(0, ...stats.daily.map((d) => d.registrations));
+        renderTable($("#daily"), [["날짜"], ["등록", true], ["추천 코드", true], ["채널 클릭", true], [""]],
+            [...stats.daily].reverse().map((d) => [d.date, d.registrations, d.referred, d.kakaoClicks, bar(d.registrations, max)]));
+        renderTable($("#ranking"), [["순위"], ["이메일"], ["추천", true], ["보너스", true], ["점수", true]],
+            stats.topReferrers.map((r) => {
+                const rank = el("span", `${r.rank}위`);
+                if (r.rank <= 2) rank.append(" ", el("span", "상품", "tag"));
+                return [rank, r.emailMasked, r.referralCount, r.referralBonus, r.totalScore];
+            }));
+    }
+
+    function showError(message, withLogin) {
+        const error = $("#error");
+        error.textContent = message;
+        if (withLogin) {
+            const link = el("a", "네이버로 로그인");
+            link.href = "/auth/naver/login?return_to=/admin.html";
+            error.append(" ", link);
+        }
+    }
+
+    async function load() {
+        $("#error").textContent = "";
+        try {
+            const response = await fetch(`/api/admin/stats?days=${$("#days").value}`, { credentials: "same-origin" });
+            if (response.status === 401) return showError("로그인이 필요합니다.", true);
+            if (response.status === 403) return showError("관리자 계정이 아닙니다. 다른 네이버 계정으로 로그인하세요.", true);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            render((await response.json()).data);
+        } catch (error) {
+            showError(`불러오지 못했습니다: ${error.message}`);
+        }
+    }
+
+    $("#refresh").addEventListener("click", load);
+    $("#days").addEventListener("change", load);
+    load();
+</script>
+</body>
+</html>
