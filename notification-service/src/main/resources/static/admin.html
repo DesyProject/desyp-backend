@@ -57,7 +57,7 @@
 
     <section class="grid">
         <div class="panel"><h2>일별 추이</h2><p class="muted">한국 시간 기준. 채널 클릭은 버튼 클릭이며 실제 채널 추가가 아닙니다.</p><table id="daily"></table></div>
-        <div class="panel"><h2>추천왕 TOP 10</h2><p class="muted">1·2위가 상품 대상(동점이면 추첨). 연락용 이메일 원문은 /api/admin/referrals/ranking</p><table id="ranking"></table></div>
+        <div class="panel"><h2>추천왕 TOP 10</h2><p class="muted">1·2위가 상품 대상(동점이면 추첨). 이메일 원문이 보이니 화면 공유에 주의하세요.</p><table id="ranking"></table></div>
     </section>
 </main>
 
@@ -138,7 +138,7 @@
             stats.topReferrers.map((r) => {
                 const rank = el("span", `${r.rank}위`);
                 if (r.rank <= 2) rank.append(" ", el("span", "상품", "tag"));
-                return [rank, r.emailMasked, r.referralCount, r.referralBonus, r.totalScore];
+                return [rank, r.email, r.referralCount, r.referralBonus, r.totalScore];
             }));
     }
 

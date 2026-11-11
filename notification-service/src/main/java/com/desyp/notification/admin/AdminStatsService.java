@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.desyp.notification.conversion.KakaoChannelClickRepository;
 import com.desyp.notification.referral.repository.ReferralRepository;
 import com.desyp.notification.subscriber.repository.SubscriberRepository;
-import com.desyp.notification.subscriber.service.SubscriberService;
 
 @Service
 @Transactional(readOnly = true)
@@ -43,7 +42,7 @@ public class AdminStatsService {
                 subscriberRepository.countByMarketingAgreedTrue(), subscriberRepository.countByNotifiedAtIsNotNull());
         var topReferrers = referralRepository.findRanking(TOP_REFERRER_RANK).stream()
                 .map(r -> new AdminStatsResponse.TopReferrer(r.getRanking(), r.getSubscriberId(),
-                        SubscriberService.mask(r.getEmail()), r.getReferralCount(), r.getReferralBonus(),
+                        r.getEmail(), r.getReferralCount(), r.getReferralBonus(),
                         r.getTotalScore()))
                 .toList();
         return new AdminStatsResponse(OffsetDateTime.now(ZoneOffset.UTC), days, registrationEndAt,

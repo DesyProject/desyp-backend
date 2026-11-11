@@ -269,8 +269,7 @@ class SubscriberRegistrationTest {
                 .andExpect(jsonPath("$.data.daily[6].registrations").value(2))
                 .andExpect(jsonPath("$.data.daily[6].referred").value(1))
                 .andExpect(jsonPath("$.data.daily[6].kakaoClicks").value(1))
-                .andExpect(jsonPath("$.data.topReferrers[0].emailMasked").value("alp***@naver.com"))
-                .andExpect(jsonPath("$.data.topReferrers[0].email").doesNotExist());
+                .andExpect(jsonPath("$.data.topReferrers[0].email").value("alpha@naver.com"));
         mvc.perform(get("/api/admin/stats").with(naver("normal-user", "normal@naver.com")))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/admin/stats?days=0").with(naver("admin-user", "admin@naver.com")))
