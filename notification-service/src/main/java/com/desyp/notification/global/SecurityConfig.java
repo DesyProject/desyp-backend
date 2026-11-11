@@ -29,7 +29,7 @@ public class SecurityConfig {
             ObjectProvider<ClientRegistrationRepository> registrations, AdminAccess adminAccess,
             NaverOAuth2UserService naverOAuth2UserService, LoginRedirect loginRedirect) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/api/csrf", "/auth/**", "/oauth2/**",
+                .requestMatchers("/api/csrf", "/auth/**", "/oauth2/**", "/admin.html",
                         "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/admin/**").access((authentication, context) ->
                         new AuthorizationDecision(adminAccess.isAllowed(authentication.get())))

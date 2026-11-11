@@ -252,6 +252,32 @@ class SubscriberRegistrationTest {
     }
 
     @Test
+    void adminStatsSummarizeRegistrationsReferralsClicksAndMail() throws Exception {
+        var a = service.register(account("a", "alpha@naver.com"), request(null));
+        service.register(account("b", "bravo@naver.com"), request(a.referralCode()));
+        conversions.recordKakaoChannelClick(account("a", "alpha@naver.com"), ConversionSource.PRE_REGISTRATION_COMPLETE);
+        jdbc.update("UPDATE subscribers SET notified_at = CURRENT_TIMESTAMP WHERE provider_account_id = 'a'");
+
+        mvc.perform(get("/api/admin/stats?days=7").with(naver("admin-user", "admin@naver.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.summary.subscribers").value(2))
+                .andExpect(jsonPath("$.data.summary.referred").value(1))
+                .andExpect(jsonPath("$.data.summary.kakaoClicks").value(1))
+                .andExpect(jsonPath("$.data.summary.mailTargets").value(2))
+                .andExpect(jsonPath("$.data.summary.mailSent").value(1))
+                .andExpect(jsonPath("$.data.daily.length()").value(7))
+                .andExpect(jsonPath("$.data.daily[6].registrations").value(2))
+                .andExpect(jsonPath("$.data.daily[6].referred").value(1))
+                .andExpect(jsonPath("$.data.daily[6].kakaoClicks").value(1))
+                .andExpect(jsonPath("$.data.topReferrers[0].email").value("alpha@naver.com"));
+        mvc.perform(get("/api/admin/stats").with(naver("normal-user", "normal@naver.com")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/stats?days=0").with(naver("admin-user", "admin@naver.com")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/admin.html")).andExpect(status().isOk());
+    }
+
+    @Test
     void adminCanSendMailAndInvalidRankingBoundsFail() throws Exception {
         mvc.perform(post("/api/admin/mail/event-start")
                         .with(naver("admin-user", "admin@naver.com")).with(csrf()))

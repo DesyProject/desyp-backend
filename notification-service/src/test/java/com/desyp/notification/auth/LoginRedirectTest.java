@@ -30,6 +30,13 @@ class LoginRedirectTest {
     }
 
     @Test
+    void allowsOnlyAdminPageAsRelativeReturnTo() {
+        assertThat(redirect.isAllowed("/admin.html")).isTrue();
+        assertThat(redirect.isAllowed("/api/admin/stats")).isFalse();
+        assertThat(redirect.isAllowed("//evil.example/admin.html")).isFalse();
+    }
+
+    @Test
     void successRedirectsToRememberedReturnToOnce() throws Exception {
         var request = new MockHttpServletRequest();
         redirect.remember(request.getSession(), "https://www.desyp.site/#entry-card");
