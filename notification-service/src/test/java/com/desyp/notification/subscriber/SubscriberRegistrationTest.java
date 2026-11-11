@@ -35,6 +35,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -46,7 +47,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = "desyp.admin.naver-account-ids=admin-user")
+@SpringBootTest(properties = {"desyp.admin.naver-account-ids=admin-user",
+        "desyp.admin.dashboard.username=dash", "desyp.admin.dashboard.password=dash-pass"})
 @AutoConfigureMockMvc
 class SubscriberRegistrationTest {
 
@@ -258,7 +260,7 @@ class SubscriberRegistrationTest {
         conversions.recordKakaoChannelClick(account("a", "alpha@naver.com"), ConversionSource.PRE_REGISTRATION_COMPLETE);
         jdbc.update("UPDATE subscribers SET notified_at = CURRENT_TIMESTAMP WHERE provider_account_id = 'a'");
 
-        mvc.perform(get("/api/admin/stats?days=7").with(naver("admin-user", "admin@naver.com")))
+        mvc.perform(get("/api/admin/stats?days=7").with(httpBasic("dash", "dash-pass")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.summary.subscribers").value(2))
                 .andExpect(jsonPath("$.data.summary.referred").value(1))
@@ -270,11 +272,14 @@ class SubscriberRegistrationTest {
                 .andExpect(jsonPath("$.data.daily[6].referred").value(1))
                 .andExpect(jsonPath("$.data.daily[6].kakaoClicks").value(1))
                 .andExpect(jsonPath("$.data.topReferrers[0].email").value("alpha@naver.com"));
-        mvc.perform(get("/api/admin/stats").with(naver("normal-user", "normal@naver.com")))
-                .andExpect(status().isForbidden());
-        mvc.perform(get("/api/admin/stats?days=0").with(naver("admin-user", "admin@naver.com")))
+        mvc.perform(get("/api/admin/stats").with(httpBasic("dash", "wrong")))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/admin/stats?days=0").with(httpBasic("dash", "dash-pass")))
                 .andExpect(status().isBadRequest());
-        mvc.perform(get("/admin.html")).andExpect(status().isOk());
+        mvc.perform(get("/admin.html"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists("WWW-Authenticate"));
+        mvc.perform(get("/admin.html").with(httpBasic("dash", "dash-pass"))).andExpect(status().isOk());
     }
 
     @Test
