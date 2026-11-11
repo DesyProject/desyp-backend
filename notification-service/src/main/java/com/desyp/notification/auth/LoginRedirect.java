@@ -18,13 +18,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 /**
  * 로그인 시작 시 받은 return_to를 세션에 두고, 네이버 콜백 처리 후 그 주소로 돌려보낸다.
  * 프런트 Origin이 아닌 주소는 열린 리다이렉트를 막기 위해 프런트 루트로 바꾼다.
- * 예외로 백엔드의 관리자 대시보드 경로 하나만 상대 경로로 허용한다.
  */
 @Component
 public class LoginRedirect implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
 
     private static final String RETURN_TO = LoginRedirect.class.getName() + ".RETURN_TO";
-    private static final String ADMIN_PAGE = "/admin.html";
 
     private final URI frontendOrigin;
 
@@ -38,7 +36,6 @@ public class LoginRedirect implements AuthenticationSuccessHandler, Authenticati
 
     boolean isAllowed(String returnTo) {
         if (returnTo == null) return false;
-        if (ADMIN_PAGE.equals(returnTo)) return true;
         try {
             URI uri = URI.create(returnTo);
             return frontendOrigin.getScheme().equals(uri.getScheme())

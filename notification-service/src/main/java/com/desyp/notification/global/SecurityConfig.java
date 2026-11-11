@@ -1,5 +1,6 @@
 package com.desyp.notification.global;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,6 +12,13 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.util.StringUtils;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -24,12 +32,34 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class SecurityConfig {
 
+    /**
+     * 관리자 대시보드는 브라우저 기본 로그인 창(HTTP Basic)으로 아이디·비밀번호를 받는다.
+     * 계정은 환경 변수로만 받고, 비어 있으면 모든 요청을 거부한다. 세션을 만들지 않는다.
+     */
+    @Bean
+    @Order(1)
+    SecurityFilterChain adminDashboardFilterChain(HttpSecurity http,
+            @Value("${desyp.admin.dashboard.username:}") String username,
+            @Value("${desyp.admin.dashboard.password:}") String password) throws Exception {
+        var encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        var users = new ArrayList<UserDetails>();
+        if (StringUtils.hasText(username) && StringUtils.hasText(password)) {
+            users.add(User.withUsername(username).password(encoder.encode(password)).roles("DASHBOARD").build());
+        }
+        http.securityMatcher("/admin.html", "/api/admin/stats")
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().hasRole("DASHBOARD"))
+                .httpBasic(basic -> basic.realmName("desyp admin"))
+                .userDetailsService(new InMemoryUserDetailsManager(users))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+        return http.build();
+    }
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
             ObjectProvider<ClientRegistrationRepository> registrations, AdminAccess adminAccess,
             NaverOAuth2UserService naverOAuth2UserService, LoginRedirect loginRedirect) throws Exception {
         http.authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/api/csrf", "/auth/**", "/oauth2/**", "/admin.html",
+                .requestMatchers("/api/csrf", "/auth/**", "/oauth2/**",
                         "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/admin/**").access((authentication, context) ->
                         new AuthorizationDecision(adminAccess.isAllowed(authentication.get())))
