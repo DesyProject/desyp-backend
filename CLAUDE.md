@@ -75,7 +75,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 
 세션은 Spring Session JDBC로 PostgreSQL `SPRING_SESSION` 테이블(V7)에 저장해 서버 재시작이나 인스턴스 추가 후에도 유지한다. 만료 세션은 앱의 `cleanup-cron`(1분 주기)이 정리한다. 세션 쿠키 속성(`HttpOnly`, `SameSite=Lax`, `Secure`)은 Boot 속성이 내장 서버에서만 적용되므로 `SecurityConfig`의 `CookieSerializer`에서 지정한다.
 
-`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`와 `/api/conversions/kakao-channel-click`은 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·네이버 식별자는 로그에 남기지 않는다.
+`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용하고, 예외로 관리자 대시보드 상대 경로 `/admin.html`만 허용한다. `/api/pre-registrations`와 `/api/conversions/kakao-channel-click`은 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·네이버 식별자는 로그에 남기지 않는다.
 
 ### 배포 전 확인
 
