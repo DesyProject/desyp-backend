@@ -40,13 +40,16 @@ public class AdminStatsService {
         var summary = new AdminStatsResponse.Summary(subscriberRepository.count(),
                 subscriberRepository.countByReferrerIsNotNull(), kakaoChannelClickRepository.count(),
                 subscriberRepository.countByMarketingAgreedTrue(), subscriberRepository.countByNotifiedAtIsNotNull());
+        var sources = subscriberRepository.countByUtmSource().stream()
+                .map(s -> new AdminStatsResponse.Source(s.getSource(), s.getCount()))
+                .toList();
         var topReferrers = referralRepository.findRanking(TOP_REFERRER_RANK).stream()
                 .map(r -> new AdminStatsResponse.TopReferrer(r.getRanking(), r.getSubscriberId(),
                         r.getEmail(), r.getReferralCount(), r.getReferralBonus(),
                         r.getTotalScore()))
                 .toList();
         return new AdminStatsResponse(OffsetDateTime.now(ZoneOffset.UTC), days, registrationEndAt,
-                summary, daily(days), topReferrers);
+                summary, daily(days), sources, topReferrers);
     }
 
     // ponytail: 기간 내 행을 모두 읽어 한국 날짜로 묶는다. 등록자가 수만 명을 넘으면 SQL GROUP BY로 바꾼다.

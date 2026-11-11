@@ -70,6 +70,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - 순위는 추천 인원과 보너스를 한 SQL에서 계산하고 `1, 1, 3` 공동 순위를 사용한다.
 - 이메일은 소문자화 후 중복을 검사한다. Gmail(`gmail.com`·`googlemail.com`)만 `+` 별칭과 점을 제거하고 `gmail.com`으로 통합한다. 다른 도메인의 `+`는 주소의 일부로 보존한다.
 - 메일 성공 시에만 `notified_at`을 기록한다.
+- `utm_source`(V10)는 등록 시 한 번만 저장하는 유입 경로 통계값이다. 형식이 맞지 않으면 등록을 막지 않고 NULL로 둔다.
 
 내 점수는 로그인 계정으로만 조회한다. 관리자 대시보드(`/admin.html`, `/api/admin/stats`)는 별도 필터 체인에서 환경 변수 계정의 HTTP Basic 인증만 받고 세션을 만들지 않는다. 그 밖의 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
 

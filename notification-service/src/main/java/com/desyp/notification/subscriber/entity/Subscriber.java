@@ -69,13 +69,16 @@ public class Subscriber {
     @Column(name = "created_at", insertable = false, updatable = false)
     private OffsetDateTime createdAt;
 
+    @Column(name = "utm_source", updatable = false)
+    private String utmSource;
+
     @Column(name = "notified_at")
     private OffsetDateTime notifiedAt;
 
     @Builder
     private Subscriber(AuthProvider provider, String providerAccountId, String email, String emailNormalized,
                         Subscriber referrer, String referralCode, boolean ageConfirmed, boolean privacyAgreed,
-                        boolean marketingAgreed, OffsetDateTime consentAt) {
+                        boolean marketingAgreed, OffsetDateTime consentAt, String utmSource) {
         this.provider = provider;
         this.providerAccountId = providerAccountId;
         this.email = email;
@@ -87,6 +90,7 @@ public class Subscriber {
         this.privacyAgreed = privacyAgreed;
         this.marketingAgreed = marketingAgreed;
         this.consentAt = consentAt;
+        this.utmSource = utmSource;
     }
 
     public void markNotified(OffsetDateTime notifiedAt) {
