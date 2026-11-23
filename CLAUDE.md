@@ -52,7 +52,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - `mail`: 관리자 트리거 기반 SES 발송과 `notified_at` 중복 방지
 - `global`: 세션, CSRF, CORS, 보안 설정
 
-사전 등록·마감·점수·순위·관리자 메일 트리거는 구현됐다. 최고점 동률 추첨, 결과 스냅샷, 공개 결과, EventBridge Scheduler, 30일 파기는 미구현이다. 429 요청 제한은 `deploy/nginx.conf`에 작성했으며 운영 적용 전이다.
+사전 등록·마감·점수·순위·동률 추첨 순위·관리자 대시보드 메일 발송 버튼은 구현됐다. 결과 스냅샷, 공개 결과, EventBridge Scheduler, 30일 파기는 미구현이다. 429 요청 제한은 `deploy/nginx.conf`에 작성했으며 운영 적용 전이다.
 
 ### 데이터 규칙
 
@@ -67,16 +67,16 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - `referrer_id`는 생성 후 변경하지 않으며 자기 자신을 가리킬 수 없다.
 - `referral_bonus`는 추천인이 있으면 1, 없으면 0이며 요청 값으로 받지 않는다.
 - 실제 추천 인원은 `referrer_id` 관계를 조회 시 `COUNT`한다. 누적 카운터를 별도로 저장하지 않는다.
-- 순위는 추천 인원과 보너스를 한 SQL에서 계산하고 `1, 1, 3` 공동 순위를 사용한다.
+- 순위는 추천 인원과 보너스를 한 SQL에서 계산하고 `1, 1, 3` 공동 순위(`rank`)를 사용한다. 추천왕은 공동 순위 안을 `SHA-256(마감 시각 + ":" + 등록자 ID)` 순서로 정한 `drawRank`로 뽑는다. 조회마다 결과가 같아야 하므로 요청 시점 난수를 쓰지 않는다.
 - 이메일은 소문자화 후 중복을 검사한다. Gmail(`gmail.com`·`googlemail.com`)만 `+` 별칭과 점을 제거하고 `gmail.com`으로 통합한다. 다른 도메인의 `+`는 주소의 일부로 보존한다.
 - 메일 성공 시에만 `notified_at`을 기록한다.
 - `utm_source`(V10)는 등록 시 한 번만 저장하는 유입 경로 통계값이다. 형식이 맞지 않으면 등록을 막지 않고 NULL로 둔다.
 
-내 점수는 로그인 계정으로만 조회한다. 관리자 대시보드(`/admin.html`, `/api/admin/stats`)는 별도 필터 체인에서 환경 변수 계정의 HTTP Basic 인증만 받고 세션을 만들지 않는다. 그 밖의 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
+내 점수는 로그인 계정으로만 조회한다. 관리자 대시보드(`/admin.html`, `/api/admin/stats`, `/api/admin/mail/event-start`)는 별도 필터 체인에서 환경 변수 계정의 HTTP Basic 인증만 받고 세션을 만들지 않는다. 이 체인은 CSRF 토큰을 쓰지 않으므로 상태를 바꾸는 요청은 JSON 전용(`consumes`)으로 받고 CORS를 열지 않는다. 그 밖의 관리자 API는 `ADMIN_NAVER_ACCOUNT_IDS`가 비어 있으면 전부 거부한다. 이메일이 포함된 순위 응답은 당첨자 연락을 위한 관리자 전용이다.
 
 세션은 Spring Session JDBC로 PostgreSQL `SPRING_SESSION` 테이블(V7)에 저장해 서버 재시작이나 인스턴스 추가 후에도 유지한다. 만료 세션은 앱의 `cleanup-cron`(1분 주기)이 정리한다. 세션 쿠키 속성(`HttpOnly`, `SameSite=Lax`, `Secure`)은 Boot 속성이 내장 서버에서만 적용되므로 `SecurityConfig`의 `CookieSerializer`에서 지정한다.
 
-`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`와 `/api/conversions/kakao-channel-click`은 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 관리자 API는 CSRF 토큰을 유지한다. 이메일·네이버 식별자는 로그에 남기지 않는다.
+`return_to`는 `desyp.frontend.origin`과 scheme·host·port가 같을 때만 허용한다. `/api/pre-registrations`와 `/api/conversions/kakao-channel-click`은 프런트가 CSRF 토큰을 받지 않으므로 CSRF 예외이며 JSON 전용·SameSite=Lax·CORS로 보호한다. 네이버 관리자 로그인으로 쓰는 관리자 API는 CSRF 토큰을 유지한다. 이메일·네이버 식별자는 로그에 남기지 않는다.
 
 ### 배포 전 확인
 
@@ -89,7 +89,7 @@ PR은 GitHub Actions `build` 체크(빌드·테스트·Checkstyle·SpotBugs)를 
 - 기존 Google 가입 데이터의 운영 전 정리 여부
 - 실제 PostgreSQL과 SES 연결
 - 메일 실패 재시도와 발송 이력
-- 추천 집계 마감, 감사 가능한 동률 추첨과 결과 스냅샷
+- 추천 집계 마감 후 추천왕 결과 스냅샷
 - EC2 초기 설정(Java 21, Nginx, 인증서, systemd, IAM 역할)과 배포 secrets 등록. 절차는 README의 EC2 배포
 
 ## 이벤트 당일 응모
