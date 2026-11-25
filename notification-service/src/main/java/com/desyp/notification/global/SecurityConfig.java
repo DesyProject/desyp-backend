@@ -46,9 +46,12 @@ public class SecurityConfig {
         if (StringUtils.hasText(username) && StringUtils.hasText(password)) {
             users.add(User.withUsername(username).password(encoder.encode(password)).roles("DASHBOARD").build());
         }
-        http.securityMatcher("/admin.html", "/api/admin/stats")
+        // 브라우저는 저장한 Basic 인증을 교차 사이트 요청에도 붙인다. 메일 발송은 JSON만 받으므로(MailController)
+        // 교차 사이트 폼은 보낼 수 없고, 이 체인은 CORS를 열지 않아 JSON 사전 요청도 실패한다. 그래서 CSRF 토큰을 쓰지 않는다.
+        http.securityMatcher("/admin.html", "/api/admin/stats", "/api/admin/mail/event-start")
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().hasRole("DASHBOARD"))
                 .httpBasic(basic -> basic.realmName("desyp admin"))
+                .csrf(csrf -> csrf.disable())
                 .userDetailsService(new InMemoryUserDetailsManager(users))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         return http.build();

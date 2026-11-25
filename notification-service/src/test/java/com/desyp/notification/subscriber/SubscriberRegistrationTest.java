@@ -13,6 +13,7 @@ import com.desyp.notification.auth.SocialAccount;
 import com.desyp.notification.conversion.ConversionService;
 import com.desyp.notification.conversion.ConversionSource;
 import com.desyp.notification.conversion.KakaoChannelClickRepository;
+import com.desyp.notification.referral.dto.ReferralRankingResponse;
 import com.desyp.notification.referral.service.ReferralService;
 import com.desyp.notification.subscriber.dto.SubscriberRegisterRequest;
 import com.desyp.notification.subscriber.repository.SubscriberRepository;
@@ -201,6 +202,7 @@ class SubscriberRegistrationTest {
         mvc.perform(post("/api/pre-registrations").with(naver("user", "user@naver.com"))
                         .contentType(MediaType.APPLICATION_JSON).content(body(null)))
                 .andExpect(status().isCreated());
+        // 메일 발송은 대시보드 계정(HTTP Basic) 전용이다. 네이버 관리자 로그인으로는 보낼 수 없다.
         mvc.perform(post("/api/admin/mail/event-start").with(naver("admin-user", "admin@naver.com")))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/csrf")).andExpect(status().isOk())
@@ -244,6 +246,9 @@ class SubscriberRegistrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].rank").value(1))
+                .andExpect(jsonPath("$.data[0].drawRank").value(1))
+                .andExpect(jsonPath("$.data[1].rank").value(1))
+                .andExpect(jsonPath("$.data[1].drawRank").value(2))
                 .andExpect(jsonPath("$.data[0].email").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].phoneNumber").doesNotExist());
         mvc.perform(get("/api/admin/referrals/ranking")
@@ -271,7 +276,10 @@ class SubscriberRegistrationTest {
                 .andExpect(jsonPath("$.data.daily[6].registrations").value(2))
                 .andExpect(jsonPath("$.data.daily[6].referred").value(1))
                 .andExpect(jsonPath("$.data.daily[6].kakaoClicks").value(1))
-                .andExpect(jsonPath("$.data.topReferrers[0].email").value("alpha@naver.com"));
+                .andExpect(jsonPath("$.data.topReferrers.length()").value(2))
+                .andExpect(jsonPath("$.data.topReferrers[0].rank").value(1))
+                .andExpect(jsonPath("$.data.topReferrers[1].drawRank").value(2))
+                .andExpect(jsonPath("$.data.topReferrers[0].email").isNotEmpty());
         mvc.perform(get("/api/admin/stats").with(httpBasic("dash", "wrong")))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/admin/stats?days=0").with(httpBasic("dash", "dash-pass")))
@@ -303,10 +311,33 @@ class SubscriberRegistrationTest {
     }
 
     @Test
-    void adminCanSendMailAndInvalidRankingBoundsFail() throws Exception {
-        mvc.perform(post("/api/admin/mail/event-start")
-                        .with(naver("admin-user", "admin@naver.com")).with(csrf()))
-                .andExpect(status().isOk());
+    void tiedReferrersGetStableDistinctDrawRanks() {
+        for (int i = 0; i < 6; i++) {
+            service.register(account("t" + i, "t" + i + "@naver.com"), request(null));
+        }
+
+        var first = referrals.ranking(1);
+        assertThat(first).hasSize(6).allSatisfy(r -> assertThat(r.rank()).isEqualTo(1));
+        assertThat(first).extracting(ReferralRankingResponse::drawRank).containsExactly(1L, 2L, 3L, 4L, 5L, 6L);
+        assertThat(referrals.ranking(1)).isEqualTo(first);
+    }
+
+    @Test
+    void dashboardAccountSendsMailWithJsonOnly() throws Exception {
+        mvc.perform(post("/api/admin/mail/event-start").with(httpBasic("dash", "dash-pass"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sentCount").value(0));
+        mvc.perform(post("/api/admin/mail/event-start").with(httpBasic("dash", "dash-pass"))
+                        .contentType(MediaType.TEXT_PLAIN).content("{}"))
+                .andExpect(status().isUnsupportedMediaType());
+        mvc.perform(post("/api/admin/mail/event-start").with(httpBasic("dash", "wrong"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void invalidRankingBoundsFail() throws Exception {
         for (String bound : new String[] {"0", "101", "abc"}) {
             mvc.perform(get("/api/admin/referrals/ranking?maxRank=" + bound)
                             .with(naver("admin-user", "admin@naver.com")))

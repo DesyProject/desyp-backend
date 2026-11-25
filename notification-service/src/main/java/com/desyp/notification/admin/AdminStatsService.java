@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.desyp.notification.conversion.KakaoChannelClickRepository;
-import com.desyp.notification.referral.repository.ReferralRepository;
+import com.desyp.notification.referral.service.ReferralService;
 import com.desyp.notification.subscriber.repository.SubscriberRepository;
 
 @Service
@@ -24,15 +24,15 @@ public class AdminStatsService {
 
     private final SubscriberRepository subscriberRepository;
     private final KakaoChannelClickRepository kakaoChannelClickRepository;
-    private final ReferralRepository referralRepository;
+    private final ReferralService referralService;
     private final OffsetDateTime registrationEndAt;
 
     public AdminStatsService(SubscriberRepository subscriberRepository,
-            KakaoChannelClickRepository kakaoChannelClickRepository, ReferralRepository referralRepository,
+            KakaoChannelClickRepository kakaoChannelClickRepository, ReferralService referralService,
             @Value("${desyp.registration.end-at}") OffsetDateTime registrationEndAt) {
         this.subscriberRepository = subscriberRepository;
         this.kakaoChannelClickRepository = kakaoChannelClickRepository;
-        this.referralRepository = referralRepository;
+        this.referralService = referralService;
         this.registrationEndAt = registrationEndAt;
     }
 
@@ -43,11 +43,7 @@ public class AdminStatsService {
         var sources = subscriberRepository.countByUtmSource().stream()
                 .map(s -> new AdminStatsResponse.Source(s.getSource(), s.getCount()))
                 .toList();
-        var topReferrers = referralRepository.findRanking(TOP_REFERRER_RANK).stream()
-                .map(r -> new AdminStatsResponse.TopReferrer(r.getRanking(), r.getSubscriberId(),
-                        r.getEmail(), r.getReferralCount(), r.getReferralBonus(),
-                        r.getTotalScore()))
-                .toList();
+        var topReferrers = referralService.ranking(TOP_REFERRER_RANK);
         return new AdminStatsResponse(OffsetDateTime.now(ZoneOffset.UTC), days, registrationEndAt,
                 summary, daily(days), sources, topReferrers);
     }

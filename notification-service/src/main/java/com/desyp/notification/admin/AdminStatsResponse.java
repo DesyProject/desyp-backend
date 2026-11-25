@@ -4,9 +4,11 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import com.desyp.notification.referral.dto.ReferralRankingResponse;
+
 public record AdminStatsResponse(OffsetDateTime generatedAt, int days, OffsetDateTime registrationEndAt,
                                  Summary summary, List<Daily> daily, List<Source> sources,
-                                 List<TopReferrer> topReferrers) {
+                                 List<ReferralRankingResponse> topReferrers) {
 
     public record Summary(long subscribers, long referred, long kakaoClicks, long mailTargets, long mailSent) {
     }
@@ -16,9 +18,5 @@ public record AdminStatsResponse(OffsetDateTime generatedAt, int days, OffsetDat
 
     /** source가 null이면 유입 경로를 모르는 등록이다. */
     public record Source(String source, long count) {
-    }
-
-    public record TopReferrer(long rank, Long subscriberId, String email, long referralCount,
-                              int referralBonus, long totalScore) {
     }
 }
