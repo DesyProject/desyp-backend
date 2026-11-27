@@ -18,9 +18,16 @@ import lombok.RequiredArgsConstructor;
 public class RegistrationMailService {
 
     private static final Logger log = LoggerFactory.getLogger(RegistrationMailService.class);
-    private static final String SUBJECT = "[desyp] 이벤트가 곧 시작됩니다";
+    // ponytail: 이벤트 일정과 주소를 고정 문구로 둔다. 이벤트가 또 열리면 설정값으로 뺀다
+    private static final String SUBJECT = "[De_sy_P] 오늘 오후 2시, 단 10분! 이벤트가 곧 시작됩니다";
     private static final String BODY = """
-            사전 등록해주셔서 감사합니다. 이벤트가 곧 시작됩니다.
+            사전 등록해주셔서 감사합니다.
+
+            De_sy_P 메인 이벤트가 11월 29일(일) 오후 2시부터 단 10분 동안 열립니다.
+            로그인 없이 Instagram 아이디만 입력하면 응모할 수 있어요.
+
+            이벤트 참여하기
+            https://www.desyp.site
 
             일정과 공지를 카카오톡으로도 받아보세요.
             https://pf.kakao.com/_ExbgxiX

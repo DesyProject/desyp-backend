@@ -285,7 +285,7 @@ Ubuntu 26.04 LTS, t3.micro(메모리 1GB) 한 대에 PostgreSQL을 함께 설치
 
 `POST /api/admin/mail/event-start` (`Content-Type: application/json`만 허용)
 
-관리자 대시보드의 "지금 발송" 버튼이 호출한다. 오픈 알림 수신에 동의했고 아직 알림을 받지 않은 등록자에게 SES 메일을 발송한다. 대시보드 계정(HTTP Basic)만 호출할 수 있고, 네이버 관리자 로그인으로는 호출할 수 없다. CSRF 토큰 대신 JSON 전용 요청과 CORS 미허용으로 교차 사이트 요청을 막는다. 발송하려면 운영 환경 변수 `SES_SENDER_EMAIL`에 SES에서 인증한 발신 주소가 있어야 한다. 본문 끝에 카카오톡 채널(`https://pf.kakao.com/_ExbgxiX`) 링크를 안내한다. 성공한 등록자만 `notified_at`을 기록해 재호출 시 중복을 막는다. 운영에서는 EventBridge Scheduler가 메인 이벤트 시작 1시간 전에 이 동작을 실행하도록 추가해야 한다.
+관리자 대시보드의 "지금 발송" 버튼이 호출한다. 오픈 알림 수신에 동의했고 아직 알림을 받지 않은 등록자에게 SES 메일을 발송한다. 대시보드 계정(HTTP Basic)만 호출할 수 있고, 네이버 관리자 로그인으로는 호출할 수 없다. CSRF 토큰 대신 JSON 전용 요청과 CORS 미허용으로 교차 사이트 요청을 막는다. 발송하려면 운영 환경 변수 `SES_SENDER_EMAIL`에 SES에서 인증한 발신 주소가 있어야 한다. 본문에는 이벤트 일시(11월 29일 오후 2시, 10분)와 참여 주소(`https://www.desyp.site`)를 넣고, 끝에 카카오톡 채널(`https://pf.kakao.com/_ExbgxiX`) 링크를 안내한다. 성공한 등록자만 `notified_at`을 기록해 재호출 시 중복을 막는다. 운영에서는 EventBridge Scheduler가 메인 이벤트 시작 1시간 전에 이 동작을 실행하도록 추가해야 한다.
 
 ## 빌드와 테스트
 
